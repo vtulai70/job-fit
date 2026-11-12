@@ -37,6 +37,10 @@ test("preferences persist across reload", async ({ page }) => {
   const phone = page.getByRole("checkbox", { name: "Include phone number in generated resume" });
   await expect(phone).toBeChecked();
   await phone.uncheck();
+  await expect(page.getByLabel("Professional Experience (years)")).toHaveValue("15");
+  await expect(page.getByLabel("Earlier Experience (years)")).toHaveValue("10");
+  await page.getByLabel("Professional Experience (years)").fill("12");
+  await page.getByLabel("Earlier Experience (years)").fill("6");
   await page.getByRole("button", { name: "Save preferences" }).click();
   await expect(page.getByText("Saved")).toBeVisible();
 
@@ -45,6 +49,8 @@ test("preferences persist across reload", async ({ page }) => {
   await expect(page.getByLabel("Tone")).toHaveValue("concise, metrics-driven");
   await expect(page.getByLabel("Notes for the AI")).toHaveValue("Emphasize AI adoption");
   await expect(page.getByRole("checkbox", { name: "Include phone number in generated resume" })).not.toBeChecked();
+  await expect(page.getByLabel("Professional Experience (years)")).toHaveValue("12");
+  await expect(page.getByLabel("Earlier Experience (years)")).toHaveValue("6");
 });
 
 test("history entry is listed and re-downloads as PDF", async ({ page }) => {

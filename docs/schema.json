@@ -53,7 +53,9 @@
         "tone": { "type": "string", "default": "", "description": "Free text, e.g. 'concise, metrics-driven'" },
         "max_pages": { "type": "integer", "default": 2 },
         "notes": { "type": "string", "default": "", "description": "Anything else the AI should always consider" },
-        "include_phone": { "type": "boolean", "default": true, "description": "Keep the phone number from the baseline in the generated resume" }
+        "include_phone": { "type": "boolean", "default": true, "description": "Keep the phone number from the baseline in the generated resume" },
+        "professional_years": { "type": "integer", "default": 15, "minimum": 1, "maximum": 50, "description": "Roles that ended within this many years go in Professional Experience (full detail)" },
+        "earlier_years": { "type": "integer", "default": 10, "minimum": 0, "maximum": 50, "description": "Roles in the next this-many years go in Earlier Experience (condensed); older roles are left out; 0 = no Earlier Experience section" }
       }
     }
   ]

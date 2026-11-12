@@ -1,6 +1,8 @@
+import pytest
+
 from app import db
 
-DEFAULTS = {"style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": True}
+DEFAULTS = {"style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": True, "professional_years": 15, "earlier_years": 10}
 
 
 def test_defaults_when_none_saved(signed_in):
@@ -10,7 +12,8 @@ def test_defaults_when_none_saved(signed_in):
 
 
 def test_put_then_get(signed_in):
-    prefs = {"style": "modern", "tone": "concise", "max_pages": 1, "notes": "Highlight AI work", "include_phone": False}
+    prefs = {"style": "modern", "tone": "concise", "max_pages": 1, "notes": "Highlight AI work", "include_phone": False,
+             "professional_years": 12, "earlier_years": 0}
     assert signed_in.put("/api/preferences", json=prefs).json() == prefs
     assert signed_in.get("/api/preferences").json() == prefs
 
@@ -27,7 +30,7 @@ def test_invalid_style_rejected(signed_in):
 def test_phone_can_be_excluded_and_included_again(signed_in):
     signed_in.put("/api/preferences", json={"include_phone": False})
     assert signed_in.get("/api/preferences").json()["include_phone"] is False
-    signed_in.put("/api/preferences", json={"include_phone": True})
+    signed_in.put("/api/preferences", json={"include_phone": True, "professional_years": 15, "earlier_years": 10})
     assert signed_in.get("/api/preferences").json()["include_phone"] is True
 
 
@@ -46,3 +49,21 @@ def test_preferences_saved_before_phone_option_default_to_include(signed_in):
 
 def test_include_phone_must_be_boolean(signed_in):
     assert signed_in.put("/api/preferences", json={"include_phone": "maybe"}).status_code == 422
+
+
+def test_experience_years_saved(signed_in):
+    signed_in.put("/api/preferences", json={"professional_years": 20, "earlier_years": 5})
+    body = signed_in.get("/api/preferences").json()
+    assert (body["professional_years"], body["earlier_years"]) == (20, 5)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("professional_years", 0), ("professional_years", 51), ("earlier_years", -1), ("earlier_years", 51), ("earlier_years", "ten")],
+)
+def test_experience_years_out_of_range_rejected(signed_in, field, value):
+    assert signed_in.put("/api/preferences", json={field: value}).status_code == 422
+
+
+def test_earlier_years_zero_allowed(signed_in):
+    assert signed_in.put("/api/preferences", json={"earlier_years": 0}).status_code == 200

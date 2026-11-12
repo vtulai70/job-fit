@@ -6,8 +6,9 @@ This project is for building a resume customizer App, which allows the user to c
 - A user can sign in (Clerk accounts; each user only sees their own data)
 - When signed in, the user can upload or update the baseline resume, paste the job description, generate the custom resume, and optionally download this as PDF
 - The generated custom resume is editable in the UI; Download PDF always uses the edited text, and that edited text is what is saved to the database
-- The baseline resume and user preferences (PDF style, tone, max pages, notes for the AI, include/exclude phone number) are persisted
+- The baseline resume and user preferences (PDF style, tone, max pages, notes for the AI, include/exclude phone number, Professional Experience years, Earlier Experience years) are persisted
 - Preferences are sent to the AI with the baseline resume and job description on every generation; unchecking "Include phone number in generated resume" removes the phone number from the generated resume (preferences must be saved to take effect)
+- Experience windows: roles that ended within the last "Professional Experience (years)" (default 15) go in a "Professional Experience" section with full detail; roles that ended in the "Earlier Experience (years)" before that (default 10) go in a condensed "Earlier Experience" section (company, title, dates, at most 2 bullets); older roles are left out. A role is placed by its end year; 0 earlier years means no Earlier Experience section
 - The custom resumes are persisted when downloaded. The company, PDF style and download timestamp are also persisted.
 - The user has an option to see the custom resume history, and be able to re-download the PDF for any of these
 - There is an AI chat feature in a sidebar; the AI is able to ask clarifying questions before generating the final custom resume. A "Generate custom resume" button starts it once a baseline and job description exist
@@ -16,7 +17,7 @@ This project is for building a resume customizer App, which allows the user to c
 
 - Runs locally in a Docker container.
 - The job description is pasted text only; URLs are not fetched.
-- The AI follows the resume rules (no new technologies, no graduation year, all employers kept) by prompt only; there is no hard post-check.
+- The AI follows the resume rules (no new technologies, no graduation year, experience windows) by prompt only; there is no hard post-check. Real-model tests check these rules.
 
 ## Technical Decisions
 

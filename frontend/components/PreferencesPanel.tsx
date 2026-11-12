@@ -57,6 +57,34 @@ export default function PreferencesPanel({ initial, onSave }: Props) {
           />
         </label>
       </div>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <label>
+          Professional Experience (years)
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={prefs.professional_years}
+            onChange={(e) => update({ professional_years: Number(e.target.value) })}
+            className={inputClass}
+          />
+        </label>
+        <label>
+          Earlier Experience (years)
+          <input
+            type="number"
+            min={0}
+            max={50}
+            value={prefs.earlier_years}
+            onChange={(e) => update({ earlier_years: Number(e.target.value) })}
+            className={inputClass}
+          />
+        </label>
+      </div>
+      <p className="-mt-1 text-xs text-ink/60">
+        Recent roles get full detail; earlier ones are condensed; older ones are left out. 0 earlier years means no
+        Earlier Experience section.
+      </p>
       <label className="text-sm">
         Tone
         <input

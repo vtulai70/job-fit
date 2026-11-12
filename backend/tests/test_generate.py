@@ -7,7 +7,9 @@ import pytest
 
 from app import ai
 from app.main import app
-from app.prompt import build_system_prompt
+from datetime import date
+
+from app.prompt import build_system_prompt, experience_rules
 from app.routes.generate import ChatMessage, GenerateResult, build_messages
 from app.routes.preferences import Preferences
 
@@ -40,31 +42,62 @@ def sent_messages(client: MagicMock) -> list[dict]:
     return client.chat.completions.parse.call_args.kwargs["messages"]
 
 
-RESUME_RESULT = GenerateResult(reply="Done", company="Initech", resume_md="# Tailored")
-QUESTION_RESULT = GenerateResult(reply="Which team size should I emphasize?", company="Initech", resume_md=None)
+RESUME_RESULT = GenerateResult(reply="Done", company="Initech", experience_plan=[], resume_md="# Tailored")
+QUESTION_RESULT = GenerateResult(
+    reply="Which team size should I emphasize?", company="Initech", experience_plan=[], resume_md=None
+)
 
 
 def test_system_prompt_contains_inputs_and_rules():
     prefs = Preferences(style="modern", tone="concise", max_pages=1, notes="Lead with AI")
-    prompt = build_system_prompt("# My resume", "Job at Acme", prefs)
+    prompt = build_system_prompt("# My resume", "Job at Acme", prefs, 2026)
     for text in ["# My resume", "Job at Acme", "1 pages", "concise", "Lead with AI", "graduation"]:
         assert text in prompt
 
 
 def test_system_prompt_includes_phone_by_default():
-    prompt = build_system_prompt("# Me", "Job", Preferences())
+    prompt = build_system_prompt("# Me", "Job", Preferences(), 2026)
     assert "Phone number: include the phone number" in prompt
     assert "do NOT include the phone number" not in prompt
 
 
 def test_system_prompt_excludes_phone_when_requested():
-    prompt = build_system_prompt("# Me", "Job", Preferences(include_phone=False))
+    prompt = build_system_prompt("# Me", "Job", Preferences(include_phone=False), 2026)
     assert "Phone number: do NOT include the phone number anywhere in the resume" in prompt
     assert "Phone number: include the phone number" not in prompt
 
 
+def test_experience_rules_default_windows():
+    rules = experience_rules(Preferences(), 2026)
+    assert "Professional Experience\" section: every role that ended in 2011 or later" in rules
+    assert "Earlier Experience\" section: every role that ended between 2001 and 2010" in rules
+    assert "at most 2 short bullets" in rules
+    assert "Leave out every role that ended before 2001." in rules
+
+
+def test_experience_rules_custom_windows():
+    rules = experience_rules(Preferences(professional_years=20, earlier_years=5), 2030)
+    assert "ended in 2010 or later" in rules
+    assert "ended between 2005 and 2009" in rules
+    assert "ended before 2005" in rules
+
+
+def test_experience_rules_without_earlier_section():
+    rules = experience_rules(Preferences(professional_years=5, earlier_years=0), 2026)
+    assert "ended in 2021 or later" in rules
+    assert "Earlier Experience\" section:" not in rules
+    assert 'Leave out every role that ended before 2021; there is no "Earlier Experience" section.' in rules
+
+
+def test_system_prompt_has_experience_windows_and_no_include_all_rule():
+    prompt = build_system_prompt("# Me", "Job", Preferences(), 2026)
+    assert "the current year is 2026; place each role by its end year" in prompt
+    assert "ended in 2011 or later" in prompt
+    assert "Include all experience entries" not in prompt
+
+
 def test_system_prompt_marks_missing_inputs():
-    prompt = build_system_prompt(None, "  ", Preferences())
+    prompt = build_system_prompt(None, "  ", Preferences(), 2026)
     assert prompt.count("(not provided)") == 2
 
 
@@ -99,7 +132,7 @@ def test_generate_uses_stored_baseline_preferences_and_history(signed_in, use_ai
     })
 
     assert response.status_code == 200
-    assert response.json() == {"reply": "Done", "company": "Initech", "resume_md": "# Tailored"}
+    assert response.json() == {"reply": "Done", "company": "Initech", "experience_plan": [], "resume_md": "# Tailored"}
     messages = sent_messages(client)
     system = messages[0]["content"]
     for text in ["# Stored baseline", "Director at Initech", "warm", "Mention mentoring"]:
@@ -114,6 +147,16 @@ def test_generate_sends_stored_phone_preference(signed_in, use_ai, include_phone
     signed_in.post("/api/generate", json={"job_description": "Director at Initech", "message": "go"})
     system = sent_messages(client)[0]["content"]
     assert f"Phone number: {expected}" in system
+
+
+def test_generate_sends_experience_windows_for_this_year(signed_in, use_ai):
+    signed_in.put("/api/preferences", json={"professional_years": 8, "earlier_years": 4})
+    client = use_ai(RESUME_RESULT)
+    signed_in.post("/api/generate", json={"job_description": "x", "message": "go"})
+    system = sent_messages(client)[0]["content"]
+    year = date.today().year
+    assert f"ended in {year - 8} or later" in system
+    assert f"ended between {year - 12} and {year - 9}" in system
 
 
 def test_generate_clarifying_question_has_no_resume(signed_in, use_ai):
@@ -143,13 +186,11 @@ def test_generate_requires_session(client, use_ai):
 
 @pytest.mark.integration
 def test_real_generation_from_resume_md():
-    system = build_system_prompt(RESUME, JOB, Preferences())
+    system = build_system_prompt(RESUME, JOB, Preferences(), 2026)
     message = "Generate my custom resume now. Do not ask questions."
     result = ai.ask_structured(ai.get_client(), build_messages(system, [], message), GenerateResult)
     assert result.company and "initech" in result.company.lower()
     assert result.resume_md and len(result.resume_md) > 1000
-    for employer in ["Salesforce", "HERE Technologies", "Nokia", "Intrinsyc", "University of Sibiu"]:
-        assert employer in result.resume_md
     assert "Azure" not in result.resume_md
     assert not re.search(r"(19|20)\d\d", education_section(result.resume_md))
 
@@ -171,9 +212,51 @@ PHONE_DIGITS = "6047734264"
 @pytest.mark.integration
 @pytest.mark.parametrize("include_phone", [True, False])
 def test_real_generation_respects_phone_preference(include_phone):
-    system = build_system_prompt(RESUME, JOB, Preferences(include_phone=include_phone))
+    system = build_system_prompt(RESUME, JOB, Preferences(include_phone=include_phone), 2026)
     message = "Generate my custom resume now. Do not ask questions."
     result = ai.ask_structured(ai.get_client(), build_messages(system, [], message), GenerateResult)
     assert result.resume_md
     assert (PHONE_DIGITS in digits(result.resume_md)) is include_phone
     assert "vtulai@yahoo.com" in result.resume_md
+
+
+def section(md: str, title: str) -> str:
+    """Text of a level-2 section, or '' if absent."""
+    match = re.search(rf"^##\s*{title}\b.*?(?=^##\s|\Z)", md, re.M | re.S)
+    return match.group(0) if match else ""
+
+
+OMITTED = ["Pinpoint", "Glenayre", "MILLENIUM", "PROFIN", "Sibiu", "Associate Assistant Lecturer"]
+
+
+@pytest.mark.integration
+def test_real_generation_default_experience_windows():
+    system = build_system_prompt(RESUME, JOB, Preferences(), 2026)
+    result = ai.ask_structured(ai.get_client(), build_messages(system, [], "Generate my custom resume now. Do not ask questions."), GenerateResult)
+    for placement in result.experience_plan:
+        expected = "professional" if placement.end_year >= 2011 else "earlier" if placement.end_year >= 2001 else "omitted"
+        assert placement.section == expected, placement
+    md = result.resume_md
+    professional = section(md, "Professional Experience")
+    earlier = section(md, "Earlier Experience")
+    for text in ["Salesforce", "HERE Technologies", "Lead Software Architect"]:
+        assert text in professional, text
+    for text in ["Intrinsyc", "Lead Software Designer"]:
+        assert text in earlier, text
+    assert "ct technologies" in earlier.lower()
+    assert "Intrinsyc" not in professional
+    assert len(re.findall(r"^\s*[-*] ", earlier, re.M)) <= 6
+    for name in OMITTED:
+        assert name.lower() not in md.lower(), name
+
+
+@pytest.mark.integration
+def test_real_generation_custom_experience_windows():
+    prefs = Preferences(professional_years=5, earlier_years=0)
+    system = build_system_prompt(RESUME, JOB, prefs, 2026)
+    result = ai.ask_structured(ai.get_client(), build_messages(system, [], "Generate my custom resume now. Do not ask questions."), GenerateResult)
+    md = result.resume_md
+    assert "Director, Software Engineering" in section(md, "Professional Experience")
+    assert section(md, "Earlier Experience") == ""
+    for name in ["HERE Technologies", "Nokia", "Intrinsyc", "Senior Product Manager"]:
+        assert name not in md, name

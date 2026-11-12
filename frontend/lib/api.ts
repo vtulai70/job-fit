@@ -8,6 +8,8 @@ export type Preferences = {
   max_pages: number;
   notes: string;
   include_phone: boolean;
+  professional_years: number;
+  earlier_years: number;
 };
 
 export type Baseline = { content_md: string | null; updated_at: string | null };

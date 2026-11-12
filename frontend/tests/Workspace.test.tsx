@@ -6,7 +6,15 @@ import Workspace, { GENERATE_MESSAGE } from "@/components/Workspace";
 
 import { mockFetch } from "./fetchMock";
 
-const PREFS = { style: "modern", tone: "concise", max_pages: 2, notes: "", include_phone: true };
+const PREFS = {
+  style: "modern",
+  tone: "concise",
+  max_pages: 2,
+  notes: "",
+  include_phone: true,
+  professional_years: 15,
+  earlier_years: 10,
+};
 const HISTORY = [{ id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z" }];
 
 function mockData(baseline: string | null = "# Saved resume") {
@@ -252,4 +260,16 @@ test("saving the phone option sends include_phone to the API", async () => {
   expect(await screen.findByText("Saved")).toBeInTheDocument();
   const put = fetchMock.mock.calls.find(([url, init]) => url === "/api/preferences" && init?.method === "PUT")!;
   expect(JSON.parse(put[1]!.body as string)).toEqual({ ...PREFS, include_phone: false });
+});
+
+test("saving experience years sends them to the API", async () => {
+  const fetchMock = mockData();
+  render(<Workspace />);
+  const professional = await screen.findByLabelText("Professional Experience (years)");
+  await userEvent.clear(professional);
+  await userEvent.type(professional, "8");
+  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+  expect(await screen.findByText("Saved")).toBeInTheDocument();
+  const put = fetchMock.mock.calls.find(([url, init]) => url === "/api/preferences" && init?.method === "PUT")!;
+  expect(JSON.parse(put[1]!.body as string)).toEqual({ ...PREFS, professional_years: 8 });
 });

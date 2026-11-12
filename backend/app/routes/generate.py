@@ -1,5 +1,6 @@
 """Chat-based custom resume generation."""
 
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter
@@ -25,9 +26,16 @@ class GenerateRequest(BaseModel):
     history: list[ChatMessage] = []
 
 
+class RolePlacement(BaseModel):
+    role: str
+    end_year: int
+    section: Literal["professional", "earlier", "omitted"]
+
+
 class GenerateResult(BaseModel):
     reply: str
     company: str | None
+    experience_plan: list[RolePlacement]
     resume_md: str | None
 
 
@@ -50,6 +58,6 @@ def build_messages(system: str, history: list[ChatMessage], message: str) -> lis
 def generate(body: GenerateRequest, user_id: UserId, db: Db, client: Client) -> GenerateResult:
     """Ask the AI to tailor the baseline to the job, or to ask clarifying questions."""
     system = build_system_prompt(
-        load_baseline(db, user_id), body.job_description, load_preferences(db, user_id)
+        load_baseline(db, user_id), body.job_description, load_preferences(db, user_id), date.today().year
     )
     return ask_structured(client, build_messages(system, body.history, body.message), GenerateResult)

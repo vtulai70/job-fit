@@ -57,7 +57,8 @@ CREATE TABLE IF NOT EXISTS preferences (
 ## Preferences JSON
 
 ```json
-{ "style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": true }
+{ "style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": true,
+  "professional_years": 15, "earlier_years": 10 }
 ```
 
 - `style`: PDF visual style, one of `professional`, `modern`, `classic`
@@ -65,6 +66,7 @@ CREATE TABLE IF NOT EXISTS preferences (
 - `max_pages`: target resume length
 - `notes`: anything else the AI should always consider
 - `include_phone`: whether the generated resume keeps the phone number from the baseline (rows saved before this key existed load as `true`)
+- `professional_years` (1-50, default 15) and `earlier_years` (0-50, default 10): experience windows, see `backend/CLAUDE.md`. Older rows load with the defaults
 
 Stored as JSON so new preference keys need no schema change. The backend validates it with a Pydantic model.
 

@@ -32,7 +32,8 @@ Tailor the user's baseline resume to the target job description to maximize the 
   mention the missing one anywhere in the resume, not even as "aligned", "familiar" or "transferable".
 - Include the contact details from the baseline resume, except the phone number when the user
   preferences say to leave it out.
-- Include all experience entries from the baseline resume.
+- Organize experience into sections exactly as the user preferences below say. Never drop a role
+  that falls inside one of those windows.
 - Only include licenses and certifications relevant to the job description.
 - Follow the user's preferences below.
 - Never invent employers, titles, dates, degrees or metrics.
@@ -43,6 +44,9 @@ Respond with JSON fields:
 - reply: a short chat message to the user. When you generate a resume, summarize the company vibe
   and the top keywords you used. When you ask questions, put the questions here.
 - company: the hiring company's name from the job description, or null if unknown.
+- experience_plan: when generating, first list EVERY role from the baseline resume with its end year
+  and the section it goes in ("professional", "earlier" or "omitted") per the experience rules below.
+  Then write resume_md following this plan exactly. Empty list when asking questions.
 - resume_md: the full custom resume in Markdown, or null when you are asking questions instead.
 """
 
@@ -51,8 +55,38 @@ PHONE_INCLUDE = "include the phone number from the baseline resume in the contac
 PHONE_EXCLUDE = "do NOT include the phone number anywhere in the resume; keep the other contact details"
 
 
-def build_system_prompt(baseline: str | None, job_description: str, prefs: Preferences) -> str:
-    """Instructions plus the user's baseline, target job and preferences."""
+def experience_rules(prefs: Preferences, year: int) -> str:
+    """Concrete year windows for the experience sections, computed here rather than by the model.
+
+    A role belongs to the most recent window it overlaps, i.e. it is placed by its end year
+    (an ongoing role ends in the current year).
+    """
+    professional_from = year - prefs.professional_years
+    earlier_from = professional_from - prefs.earlier_years
+    rules = [
+        f'- "## Professional Experience" section: every role that ended in {professional_from} or later '
+        "(ongoing roles included), with full detail.",
+    ]
+    if prefs.earlier_years:
+        rules.append(
+            f'- "## Earlier Experience" section: every role that ended between {earlier_from} and '
+            f"{professional_from - 1}, condensed to company, title, dates and at most 2 short bullets."
+        )
+    rules.append(
+        f"- Leave out every role that ended before {earlier_from}"
+        + ("." if prefs.earlier_years else '; there is no "Earlier Experience" section.')
+        + " A left-out role must not appear anywhere in the resume, not even as a one-line or condensed entry."
+    )
+    rules.append(
+        f"- Check every role one by one using its end year. For example, a role dated "
+        f"{earlier_from - 3} - {earlier_from - 1} ended in {earlier_from - 1}, which is before {earlier_from}, "
+        "so it is left out."
+    )
+    return "\n".join(rules)
+
+
+def build_system_prompt(baseline: str | None, job_description: str, prefs: Preferences, year: int) -> str:
+    """Instructions plus the user's baseline, target job and preferences, for the given current year."""
     return f"""{INSTRUCTIONS}
 # User preferences
 
@@ -60,6 +94,8 @@ def build_system_prompt(baseline: str | None, job_description: str, prefs: Prefe
 - Tone: {prefs.tone or "no preference"}
 - Notes: {prefs.notes or "none"}
 - Phone number: {PHONE_INCLUDE if prefs.include_phone else PHONE_EXCLUDE}
+- Experience (the current year is {year}; place each role by its end year):
+{experience_rules(prefs, year)}
 
 # Baseline resume
 

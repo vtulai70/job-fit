@@ -6,7 +6,15 @@ import HistoryPanel from "@/components/HistoryPanel";
 import PreferencesPanel from "@/components/PreferencesPanel";
 import type { Preferences } from "@/lib/api";
 
-const PREFS: Preferences = { style: "professional", tone: "", max_pages: 2, notes: "", include_phone: true };
+const PREFS: Preferences = {
+  style: "professional",
+  tone: "",
+  max_pages: 2,
+  notes: "",
+  include_phone: true,
+  professional_years: 15,
+  earlier_years: 10,
+};
 
 test("history shows empty state", () => {
   render(<HistoryPanel entries={[]} />);
@@ -52,6 +60,8 @@ test("preferences form saves edited values and confirms", async () => {
     tone: "concise",
     notes: "Lead with AI",
     include_phone: true,
+    professional_years: 15,
+    earlier_years: 10,
   });
   expect(await screen.findByText("Saved")).toBeInTheDocument();
 });
@@ -86,4 +96,31 @@ test("toggling the phone option clears the saved confirmation", async () => {
   expect(await screen.findByText("Saved")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("checkbox", { name: "Include phone number in generated resume" }));
   expect(screen.queryByText("Saved")).not.toBeInTheDocument();
+});
+
+test("experience year fields show the saved values", () => {
+  render(<PreferencesPanel initial={{ ...PREFS, professional_years: 12, earlier_years: 0 }} onSave={vi.fn()} />);
+  expect(screen.getByLabelText("Professional Experience (years)")).toHaveValue(12);
+  expect(screen.getByLabelText("Earlier Experience (years)")).toHaveValue(0);
+});
+
+test("experience year fields have sensible limits", () => {
+  render(<PreferencesPanel initial={PREFS} onSave={vi.fn()} />);
+  const professional = screen.getByLabelText("Professional Experience (years)");
+  const earlier = screen.getByLabelText("Earlier Experience (years)");
+  expect(professional).toHaveAttribute("min", "1");
+  expect(professional).toHaveAttribute("max", "50");
+  expect(earlier).toHaveAttribute("min", "0");
+  expect(earlier).toHaveAttribute("max", "50");
+});
+
+test("editing experience years saves numbers", async () => {
+  const onSave = vi.fn().mockResolvedValue(undefined);
+  render(<PreferencesPanel initial={PREFS} onSave={onSave} />);
+  await userEvent.clear(screen.getByLabelText("Professional Experience (years)"));
+  await userEvent.type(screen.getByLabelText("Professional Experience (years)"), "20");
+  await userEvent.clear(screen.getByLabelText("Earlier Experience (years)"));
+  await userEvent.type(screen.getByLabelText("Earlier Experience (years)"), "5");
+  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+  expect(onSave).toHaveBeenCalledWith({ ...PREFS, professional_years: 20, earlier_years: 5 });
 });

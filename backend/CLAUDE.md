@@ -19,11 +19,11 @@ Written ahead of the code (Step 1); update as code lands.
 - `app/db.py` - schema (see `docs/DATABASE.md`), `init_db`, `connect`, `Db` per-request connection dependency
 - `app/routes/resume.py` - `GET/PUT /api/resume/baseline`
 - `app/routes/history.py` - `GET/POST /api/history`, `GET /api/history/{id}/pdf`
-- `app/routes/preferences.py` - `GET/PUT /api/preferences`, `Preferences` model (style, tone, max_pages, notes, include_phone), `load_preferences`; new keys get defaults so older stored JSON still loads
+- `app/routes/preferences.py` - `GET/PUT /api/preferences`, `Preferences` model (style, tone, max_pages, notes, include_phone, professional_years 1-50, earlier_years 0-50), `load_preferences`; new keys get defaults so older stored JSON still loads
 - `app/pdf.py` - markdown -> HTML -> PDF (WeasyPrint), styles `professional`, `modern`, `classic`
 - `app/ai.py` - OpenRouter client (`get_client` dependency, `Client` type), `ask`, `ask_structured` (Structured Outputs, `require_parameters`), `GET /api/ai/check` (2+2)
-- `app/prompt.py` - system prompt adapted from `docs/INSTRUCTIONS.md`; `build_system_prompt(baseline, job, prefs)` adds a "User preferences" block (max pages, tone, notes, phone include/exclude)
-- `app/routes/generate.py` - `POST /api/generate`: stored baseline + preferences + request job/message/history -> `{reply, company, resume_md}` (`resume_md` null while asking questions)
+- `app/prompt.py` - system prompt adapted from `docs/INSTRUCTIONS.md`; `build_system_prompt(baseline, job, prefs)` adds a "User preferences" block (max pages, tone, notes, phone include/exclude, experience windows). `experience_rules(prefs, year)` turns the year settings into concrete cutoff years in code (models are unreliable at date arithmetic); the route passes `date.today().year`
+- `app/routes/generate.py` - `POST /api/generate`: stored baseline + preferences + request job/message/history -> `{reply, company, experience_plan, resume_md}` (`resume_md` null while asking questions). `experience_plan` lists each baseline role with end year and section (professional/earlier/omitted) before the resume is written: without it the model leaked pre-cutoff roles in about 1 of 6 runs, with it 0 of 24. The frontend ignores it
 - `static/` - built frontend, copied in by the Dockerfile (git-ignored; override with `STATIC_DIR` env)
 - `tests/` - pytest; `conftest.py` sets env before app import and provides `client` (fresh temp db per test) and `signed_in` fixtures
 
