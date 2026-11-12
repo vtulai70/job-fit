@@ -113,7 +113,7 @@ test("generate shows the reply and the custom resume", async () => {
 
   expect(await screen.findByText("Here is your resume.")).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Custom resume for Initech" })).toBeInTheDocument();
-  expect(screen.getByLabelText("Custom resume content")).toHaveTextContent("# Tailored for Initech");
+  expect(screen.getByLabelText("Custom resume content")).toHaveValue("# Tailored for Initech");
   expect(generateBodies(fetchMock)).toEqual([
     { job_description: "Director at Initech", message: GENERATE_MESSAGE, history: [] },
   ]);
@@ -127,7 +127,7 @@ test("clarifying question, then answer sends conversation history", async () => 
   expect(screen.queryByLabelText("Custom resume content")).not.toBeInTheDocument();
 
   await userEvent.type(screen.getByLabelText("Message"), "Teams of 40{Enter}");
-  expect(await screen.findByLabelText("Custom resume content")).toHaveTextContent("# Tailored for Initech");
+  expect(await screen.findByLabelText("Custom resume content")).toHaveValue("# Tailored for Initech");
   expect(generateBodies(fetchMock)[1]).toEqual({
     job_description: "Director at Initech",
     message: "Teams of 40",
@@ -169,4 +169,77 @@ test("downloading the generated resume records history with company, job and sty
     style: "modern",
   });
   expect(screen.getByRole("link", { name: "Download Initech resume" })).toBeInTheDocument();
+});
+
+function mockHistoryPost(fetchMock: ReturnType<typeof mockData>) {
+  const base = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
+    url === "/api/history" && init?.method === "POST"
+      ? Response.json({ id: 9, company: "Initech", style: "modern", downloaded_at: "2026-11-11T12:00:00Z" })
+      : base(url, init),
+  );
+  vi.stubGlobal("location", { assign: vi.fn() });
+}
+
+function postedHistory(fetchMock: ReturnType<typeof mockData>) {
+  const post = fetchMock.mock.calls.find(([url, init]) => url === "/api/history" && init?.method === "POST")!;
+  return JSON.parse(post[1]!.body as string);
+}
+
+test("the generated resume can be edited", async () => {
+  mockChat({ body: RESUME_RESULT });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  const editor = await screen.findByLabelText("Custom resume content");
+  await userEvent.clear(editor);
+  await userEvent.type(editor, "# My own edit");
+  expect(editor).toHaveValue("# My own edit");
+  expect(screen.getByRole("heading", { name: "Custom resume for Initech" })).toBeInTheDocument();
+});
+
+test("download saves and renders the edited text, not the generated one", async () => {
+  const fetchMock = mockChat({ body: RESUME_RESULT });
+  mockHistoryPost(fetchMock);
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  const editor = await screen.findByLabelText("Custom resume content");
+  await userEvent.type(editor, "\n\n## Added by me");
+  await userEvent.click(screen.getByRole("button", { name: "Download PDF" }));
+
+  await vi.waitFor(() => expect(postedHistory(fetchMock).content_md).toBe("# Tailored for Initech\n\n## Added by me"));
+});
+
+test("edits survive a clarifying-question reply in the chat", async () => {
+  const fetchMock = mockChat({ body: RESUME_RESULT }, { body: QUESTION_RESULT });
+  mockHistoryPost(fetchMock);
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  const editor = await screen.findByLabelText("Custom resume content");
+  await userEvent.clear(editor);
+  await userEvent.type(editor, "# Edited");
+
+  await userEvent.type(screen.getByLabelText("Message"), "Any thoughts?{Enter}");
+  expect(await screen.findByText("Which team size should I emphasize?")).toBeInTheDocument();
+  expect(editor).toHaveValue("# Edited");
+
+  await userEvent.click(screen.getByRole("button", { name: "Download PDF" }));
+  await vi.waitFor(() => expect(postedHistory(fetchMock).content_md).toBe("# Edited"));
+});
+
+test("a newly generated resume replaces earlier edits", async () => {
+  mockChat({ body: RESUME_RESULT }, { body: { ...RESUME_RESULT, resume_md: "# Second version" } });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  const editor = await screen.findByLabelText("Custom resume content");
+  await userEvent.type(editor, " edited");
+  await userEvent.type(screen.getByLabelText("Message"), "Regenerate please{Enter}");
+  await vi.waitFor(() => expect(screen.getByLabelText("Custom resume content")).toHaveValue("# Second version"));
+});
+
+test("clearing the resume disables download", async () => {
+  mockChat({ body: RESUME_RESULT });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await userEvent.clear(await screen.findByLabelText("Custom resume content"));
+  expect(screen.getByRole("button", { name: "Download PDF" })).toBeDisabled();
 });

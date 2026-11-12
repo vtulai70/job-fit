@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -35,7 +36,7 @@ test("generate, download PDF, and see it in history", async ({ page }) => {
   const chat = page.getByRole("log", { name: "Conversation" });
   await expect(chat.getByText("Tailored for Umbrella's data-driven culture.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Custom resume for Umbrella Corp" })).toBeVisible();
-  await expect(page.getByLabel("Custom resume content")).toContainText("Engineering leader for Umbrella Corp.");
+  await expect(page.getByLabel("Custom resume content")).toHaveValue(TAILORED);
   expect(bodies[0]).toMatchObject({
     job_description: "Umbrella Corp is hiring a Director of Engineering.",
     history: [],
@@ -68,7 +69,7 @@ test("clarifying question is answered in chat before the resume", async ({ page 
   await page.getByLabel("Message").fill("Platform leadership");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(chat.getByText("Done, focused on platform.")).toBeVisible();
-  await expect(page.getByLabel("Custom resume content")).toContainText("Umbrella Corp");
+  await expect(page.getByLabel("Custom resume content")).toHaveValue(TAILORED);
   expect(bodies[1]).toMatchObject({ message: "Platform leadership" });
   expect((bodies[1].history as unknown[]).length).toBe(2);
 });
@@ -80,4 +81,43 @@ test("generate button is disabled until a job description is pasted", async ({ p
   await expect(button).toBeDisabled();
   await page.getByLabel("Job description").fill("Some job");
   await expect(button).toBeEnabled();
+});
+
+/** Read the newest stored custom resume straight from the e2e container's database. */
+function latestStoredResume(): string {
+  const script =
+    "import sqlite3; print(sqlite3.connect('data/jobfit.db')" +
+    ".execute('SELECT content_md FROM custom_resumes ORDER BY id DESC LIMIT 1').fetchone()[0], end='')";
+  return execFileSync("docker", ["exec", "jobfit-e2e", "python3", "-c", script], { encoding: "utf-8" });
+}
+
+test("edited resume is what gets downloaded and stored", async ({ page }) => {
+  await mockGenerate(page, [
+    { reply: "Here you go.", company: "Umbrella Corp", resume_md: TAILORED },
+  ]);
+  await prepare(page);
+  await page.getByRole("button", { name: "Generate custom resume" }).click();
+  const editor = page.getByLabel("Custom resume content");
+  await expect(editor).toHaveValue(TAILORED);
+
+  const edited = "# Voicu Tulai\n\n## Summary\n\nHand-edited for Umbrella: led 40-person platform org.";
+  await editor.fill(edited);
+
+  const posted = page.waitForRequest((r) => r.url().endsWith("/api/history") && r.method() === "POST");
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download PDF" }).click();
+  expect((await posted).postDataJSON()).toMatchObject({ company: "Umbrella Corp", content_md: edited });
+  const download = await downloadPromise;
+  expect((await readFile(await download.path())).subarray(0, 4).toString()).toBe("%PDF");
+
+  expect(latestStoredResume()).toBe(edited);
+  await expect(page.getByRole("region", { name: "Download history" }).getByText("Umbrella Corp").first()).toBeVisible();
+});
+
+test("clearing the resume disables download", async ({ page }) => {
+  await mockGenerate(page, [{ reply: "Done.", company: "Umbrella Corp", resume_md: TAILORED }]);
+  await prepare(page);
+  await page.getByRole("button", { name: "Generate custom resume" }).click();
+  await page.getByLabel("Custom resume content").fill("");
+  await expect(page.getByRole("button", { name: "Download PDF" })).toBeDisabled();
 });

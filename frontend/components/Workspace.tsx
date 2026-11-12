@@ -58,6 +58,10 @@ export default function Workspace() {
     }
   }
 
+  function editCustomResume(content_md: string) {
+    setCustomResume((current) => ({ ...current!, content_md }));
+  }
+
   async function downloadCustomResume() {
     const entry = await api.downloadCustomResume({
       company: customResume!.company,
@@ -73,7 +77,7 @@ export default function Workspace() {
       <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
         <ResumePanel content={baseline} onUpload={uploadBaseline} />
         <JobDescription value={jobDescription} onChange={setJobDescription} />
-        <CustomResume resume={customResume} onDownload={downloadCustomResume} />
+        <CustomResume resume={customResume} onChange={editCustomResume} onDownload={downloadCustomResume} />
         <HistoryPanel entries={history} />
         {prefs && <PreferencesPanel initial={prefs} onSave={savePreferences} />}
       </main>

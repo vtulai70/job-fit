@@ -14,8 +14,8 @@ Read `AGENTS.md` first: this NextJS version differs from older training data; it
 
 - `app/` - root layout, `page.tsx` (home), `globals.css` (theme tokens)
 - `app/page.tsx` renders the client `App`: `ClerkProvider` (`@clerk/react`, Core 3) with `<Show when="signed-out">` -> `<SignIn routing="hash">`, `<Show when="signed-in">` -> `Header` (`UserButton`) + `Workspace`
-- `components/Workspace.tsx` - owns user data and chat state; loads baseline, history and preferences on mount, saves through `lib/api.ts`, sends chat turns to `/api/generate` (history kept client-side)
-- `components/` panels take props only: `ResumePanel` (upload .md/.txt), `JobDescription` (pasted text), `CustomResume` (+ Download PDF), `HistoryPanel` (re-download links), `PreferencesPanel`, `ChatSidebar` (conversation, Generate button, message box); plus `Header`, `HealthIndicator`
+- `components/Workspace.tsx` - owns user data and chat state (including the edited custom resume, which a new AI resume replaces); loads baseline, history and preferences on mount, saves through `lib/api.ts`, sends chat turns to `/api/generate` (history kept client-side)
+- `components/` panels take props only: `ResumePanel` (upload .md/.txt), `JobDescription` (pasted text), `CustomResume` (editable textarea; Download PDF sends the edited text), `HistoryPanel` (re-download links), `PreferencesPanel`, `ChatSidebar` (conversation, Generate button, message box); plus `Header`, `HealthIndicator`
 - `lib/api.ts` - typed data calls, `generate`, `pdfUrl`, `downloadCustomResume` (records history, then downloads)
 - `tests/` - Vitest unit tests (`*.test.{ts,tsx}`), `setup.ts`, `fetchMock.ts` (stub fetch by "METHOD /path")
 - `e2e/` - Playwright tests (`*.spec.ts`); `global.setup.ts` runs `clerkSetup()` and creates the two Clerk test users if missing; `helpers.ts` (`signIn`/`signOut` via `@clerk/testing`, `ALICE`, `BOB`); `generate.spec.ts` mocks `/api/generate` with `page.route` (no AI cost)

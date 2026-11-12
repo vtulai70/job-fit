@@ -68,3 +68,22 @@ def test_pdf_filename_safe_for_unusual_company(signed_in):
 
 def test_pdf_unknown_entry(signed_in):
     assert signed_in.get("/api/history/999/pdf").status_code == 404
+
+
+def test_stored_content_is_exactly_what_was_posted(signed_in):
+    edited = "# Jane Doe\n\n## Edited by hand\n\n- Unicode ok: café, — dash\n"
+    entry_id = signed_in.post("/api/history", json={**ENTRY, "content_md": edited}).json()["id"]
+    conn = db.connect()
+    row = conn.execute("SELECT content_md FROM custom_resumes WHERE id = ?", (entry_id,)).fetchone()
+    conn.close()
+    assert row["content_md"] == edited
+
+
+def test_pdf_rendered_from_stored_content_and_style(signed_in, monkeypatch):
+    from app.routes import history
+
+    calls = []
+    monkeypatch.setattr(history, "render_pdf", lambda md, style: calls.append((md, style)) or b"%PDF-fake")
+    entry_id = signed_in.post("/api/history", json={**ENTRY, "content_md": "# Edited text", "style": "classic"}).json()["id"]
+    assert signed_in.get(f"/api/history/{entry_id}/pdf").content == b"%PDF-fake"
+    assert calls == [("# Edited text", "classic")]
