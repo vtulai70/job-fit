@@ -52,7 +52,8 @@
         "style": { "type": "string", "enum": ["professional", "modern", "classic"], "default": "professional" },
         "tone": { "type": "string", "default": "", "description": "Free text, e.g. 'concise, metrics-driven'" },
         "max_pages": { "type": "integer", "default": 2 },
-        "notes": { "type": "string", "default": "", "description": "Anything else the AI should always consider" }
+        "notes": { "type": "string", "default": "", "description": "Anything else the AI should always consider" },
+        "include_phone": { "type": "boolean", "default": true, "description": "Keep the phone number from the baseline in the generated resume" }
       }
     }
   ]

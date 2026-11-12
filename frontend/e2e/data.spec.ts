@@ -34,6 +34,9 @@ test("preferences persist across reload", async ({ page }) => {
   await page.getByLabel("PDF style").selectOption("classic");
   await page.getByLabel("Tone").fill("concise, metrics-driven");
   await page.getByLabel("Notes for the AI").fill("Emphasize AI adoption");
+  const phone = page.getByRole("checkbox", { name: "Include phone number in generated resume" });
+  await expect(phone).toBeChecked();
+  await phone.uncheck();
   await page.getByRole("button", { name: "Save preferences" }).click();
   await expect(page.getByText("Saved")).toBeVisible();
 
@@ -41,6 +44,7 @@ test("preferences persist across reload", async ({ page }) => {
   await expect(page.getByLabel("PDF style")).toHaveValue("classic");
   await expect(page.getByLabel("Tone")).toHaveValue("concise, metrics-driven");
   await expect(page.getByLabel("Notes for the AI")).toHaveValue("Emphasize AI adoption");
+  await expect(page.getByRole("checkbox", { name: "Include phone number in generated resume" })).not.toBeChecked();
 });
 
 test("history entry is listed and re-downloads as PDF", async ({ page }) => {

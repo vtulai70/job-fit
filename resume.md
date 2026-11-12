@@ -1,5 +1,10 @@
 # Voicu Tulai's resume
 
+## Contact
+Port Moody, BC
+vtulai@yahoo.com
+(604) 773-4264
+
 ## Professional Summary
 
 Hands-on, high-performing engineering leader with extensive experience scaling teams and architecture across organizations of all sizes. Combines strategic vision with a bias for action, bridging deep system design and coding expertise with people leadership to foster trust, multiply team performance, and deliver customer-centric value.
@@ -88,6 +93,49 @@ Throughout my career—as a people leader, architect, and developer—I have con
 - Owned full-lifecycle software delivery from proposal and requirements definition to development and testing across diverse client projects. 
 - Key contributions included serving as networking team lead for the Symbian CDMA stack, acting as architect on Windows CE-based initiatives, and instructing official developer training courses for Windows CE and Symbian OS.
 
+### CT TECHNOLOGIES — Lead Software Engineer / Part Owner
+
+*1999 - 2004*
+
+- Developed version 3 of the Play Manager product helping sports teams create playbooks and animate plays. 
+- Allowing our customers to design plays with the PC app and publish to the web was very innovative at the time.
+
+### Pinpoint Technologies — R&D Manager
+
+*1997 - 2000*
+
+- Led a development team, architected and implemented a new EMS pen-based data collection system for first responders.
+
+### Glenayre Technologies — Software Designer
+
+*1997 - 1998*
+
+- Designed and developed C communication software for paging infrastructure components.
+
+### MILLENIUM SA — Senior Software Engineer
+
+*1994 - 1997*
+
+- Developed embedded and PC software for data acquisition, regulation and presentation of various control systems.
+
+### PROFIN Ltd — Software Engineer – Contract
+
+*1994 - 1997*
+
+- Designed and developed PC applications for the control, data acquisition and presentation of distributed weighting systems installed in several glass factories.
+
+### University of Sibiu, Romania — Assistant Lecturer
+
+*1995 - 1997*
+
+- Taught courses / labs of Microprocessor Systems, Computer Architecture and Numerical Computers.
+
+### Politehnic University of Timișoara, Romania — Associate Assistant Lecturer
+
+*1993 - 1994*
+
+- Taught laboratories of Numerical Computers and Multi-Microprocessor Systems
+
 ## Education
 
 - **M.Sc.** — Polytechnic University Timisoara (Completed 1995)
@@ -110,8 +158,3 @@ Throughout my career—as a people leader, architect, and developer—I have con
 
 - **Coral Reef Conservation Volunteer** — Reef Renewal Foundation Bonaire
 - **Sea Turtle Conservation Volunteer** — ProTECTOR Inc
-
-##Contact
-Port Moody, BC
-vtulai@yahoo.com
-(604) 773-4264

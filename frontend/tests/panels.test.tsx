@@ -6,7 +6,7 @@ import HistoryPanel from "@/components/HistoryPanel";
 import PreferencesPanel from "@/components/PreferencesPanel";
 import type { Preferences } from "@/lib/api";
 
-const PREFS: Preferences = { style: "professional", tone: "", max_pages: 2, notes: "" };
+const PREFS: Preferences = { style: "professional", tone: "", max_pages: 2, notes: "", include_phone: true };
 
 test("history shows empty state", () => {
   render(<HistoryPanel entries={[]} />);
@@ -46,7 +46,13 @@ test("preferences form saves edited values and confirms", async () => {
   await userEvent.type(screen.getByLabelText("Tone"), "concise");
   await userEvent.type(screen.getByLabelText("Notes for the AI"), "Lead with AI");
   await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  expect(onSave).toHaveBeenCalledWith({ style: "classic", max_pages: 3, tone: "concise", notes: "Lead with AI" });
+  expect(onSave).toHaveBeenCalledWith({
+    style: "classic",
+    max_pages: 3,
+    tone: "concise",
+    notes: "Lead with AI",
+    include_phone: true,
+  });
   expect(await screen.findByText("Saved")).toBeInTheDocument();
 });
 
@@ -55,5 +61,29 @@ test("editing after save clears the confirmation", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
   expect(await screen.findByText("Saved")).toBeInTheDocument();
   await userEvent.type(screen.getByLabelText("Tone"), "x");
+  expect(screen.queryByText("Saved")).not.toBeInTheDocument();
+});
+
+test("phone checkbox reflects the saved preference", () => {
+  const { unmount } = render(<PreferencesPanel initial={PREFS} onSave={vi.fn()} />);
+  expect(screen.getByRole("checkbox", { name: "Include phone number in generated resume" })).toBeChecked();
+  unmount();
+  render(<PreferencesPanel initial={{ ...PREFS, include_phone: false }} onSave={vi.fn()} />);
+  expect(screen.getByRole("checkbox", { name: "Include phone number in generated resume" })).not.toBeChecked();
+});
+
+test("unchecking the phone option saves include_phone false", async () => {
+  const onSave = vi.fn().mockResolvedValue(undefined);
+  render(<PreferencesPanel initial={PREFS} onSave={onSave} />);
+  await userEvent.click(screen.getByRole("checkbox", { name: "Include phone number in generated resume" }));
+  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+  expect(onSave).toHaveBeenCalledWith({ ...PREFS, include_phone: false });
+});
+
+test("toggling the phone option clears the saved confirmation", async () => {
+  render(<PreferencesPanel initial={PREFS} onSave={vi.fn().mockResolvedValue(undefined)} />);
+  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+  expect(await screen.findByText("Saved")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("checkbox", { name: "Include phone number in generated resume" }));
   expect(screen.queryByText("Saved")).not.toBeInTheDocument();
 });

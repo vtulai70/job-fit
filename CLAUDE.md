@@ -6,7 +6,8 @@ This project is for building a resume customizer App, which allows the user to c
 - A user can sign in (Clerk accounts; each user only sees their own data)
 - When signed in, the user can upload or update the baseline resume, paste the job description, generate the custom resume, and optionally download this as PDF
 - The generated custom resume is editable in the UI; Download PDF always uses the edited text, and that edited text is what is saved to the database
-- The baseline resume and user preferences (PDF style, tone, max pages, notes for the AI) are persisted
+- The baseline resume and user preferences (PDF style, tone, max pages, notes for the AI, include/exclude phone number) are persisted
+- Preferences are sent to the AI with the baseline resume and job description on every generation; unchecking "Include phone number in generated resume" removes the phone number from the generated resume (preferences must be saved to take effect)
 - The custom resumes are persisted when downloaded. The company, PDF style and download timestamp are also persisted.
 - The user has an option to see the custom resume history, and be able to re-download the PDF for any of these
 - There is an AI chat feature in a sidebar; the AI is able to ask clarifying questions before generating the final custom resume. A "Generate custom resume" button starts it once a baseline and job description exist

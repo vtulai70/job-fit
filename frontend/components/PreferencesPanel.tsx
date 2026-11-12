@@ -75,6 +75,15 @@ export default function PreferencesPanel({ initial, onSave }: Props) {
           className={inputClass}
         />
       </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={prefs.include_phone}
+          onChange={(e) => update({ include_phone: e.target.checked })}
+          className="h-4 w-4 accent-primary"
+        />
+        Include phone number in generated resume
+      </label>
       <div className="flex items-center gap-3">
         <button type="submit" className="rounded bg-primary px-3 py-1 text-sm font-semibold text-canvas">
           Save preferences

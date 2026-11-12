@@ -6,7 +6,7 @@ import Workspace, { GENERATE_MESSAGE } from "@/components/Workspace";
 
 import { mockFetch } from "./fetchMock";
 
-const PREFS = { style: "modern", tone: "concise", max_pages: 2, notes: "" };
+const PREFS = { style: "modern", tone: "concise", max_pages: 2, notes: "", include_phone: true };
 const HISTORY = [{ id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z" }];
 
 function mockData(baseline: string | null = "# Saved resume") {
@@ -242,4 +242,14 @@ test("clearing the resume disables download", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
   await userEvent.clear(await screen.findByLabelText("Custom resume content"));
   expect(screen.getByRole("button", { name: "Download PDF" })).toBeDisabled();
+});
+
+test("saving the phone option sends include_phone to the API", async () => {
+  const fetchMock = mockData();
+  render(<Workspace />);
+  await userEvent.click(await screen.findByRole("checkbox", { name: "Include phone number in generated resume" }));
+  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+  expect(await screen.findByText("Saved")).toBeInTheDocument();
+  const put = fetchMock.mock.calls.find(([url, init]) => url === "/api/preferences" && init?.method === "PUT")!;
+  expect(JSON.parse(put[1]!.body as string)).toEqual({ ...PREFS, include_phone: false });
 });

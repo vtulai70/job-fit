@@ -18,6 +18,7 @@ class Preferences(BaseModel):
     tone: str = ""
     max_pages: int = 2
     notes: str = ""
+    include_phone: bool = True
 
 
 def load_preferences(db: Db, user_id: int) -> Preferences:

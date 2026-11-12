@@ -57,13 +57,14 @@ CREATE TABLE IF NOT EXISTS preferences (
 ## Preferences JSON
 
 ```json
-{ "style": "professional", "tone": "", "max_pages": 2, "notes": "" }
+{ "style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": true }
 ```
 
 - `style`: PDF visual style, one of `professional`, `modern`, `classic`
 - `tone`: free text guidance for the AI
 - `max_pages`: target resume length
 - `notes`: anything else the AI should always consider
+- `include_phone`: whether the generated resume keeps the phone number from the baseline (rows saved before this key existed load as `true`)
 
 Stored as JSON so new preference keys need no schema change. The backend validates it with a Pydantic model.
 

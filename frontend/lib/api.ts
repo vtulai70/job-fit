@@ -2,7 +2,13 @@
 
 export type Style = "professional" | "modern" | "classic";
 
-export type Preferences = { style: Style; tone: string; max_pages: number; notes: string };
+export type Preferences = {
+  style: Style;
+  tone: string;
+  max_pages: number;
+  notes: string;
+  include_phone: boolean;
+};
 
 export type Baseline = { content_md: string | null; updated_at: string | null };
 

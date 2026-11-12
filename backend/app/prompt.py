@@ -30,7 +30,8 @@ Tailor the user's baseline resume to the target job description to maximize the 
   ones commonly used alongside them. Every tool you list must appear in the baseline. If the job asks
   for one that is missing (e.g. Azure), emphasize the closest one the user has (e.g. AWS) and do not
   mention the missing one anywhere in the resume, not even as "aligned", "familiar" or "transferable".
-- Include the contact details from the baseline resume.
+- Include the contact details from the baseline resume, except the phone number when the user
+  preferences say to leave it out.
 - Include all experience entries from the baseline resume.
 - Only include licenses and certifications relevant to the job description.
 - Follow the user's preferences below.
@@ -46,6 +47,10 @@ Respond with JSON fields:
 """
 
 
+PHONE_INCLUDE = "include the phone number from the baseline resume in the contact details"
+PHONE_EXCLUDE = "do NOT include the phone number anywhere in the resume; keep the other contact details"
+
+
 def build_system_prompt(baseline: str | None, job_description: str, prefs: Preferences) -> str:
     """Instructions plus the user's baseline, target job and preferences."""
     return f"""{INSTRUCTIONS}
@@ -54,6 +59,7 @@ def build_system_prompt(baseline: str | None, job_description: str, prefs: Prefe
 - Maximum length: {prefs.max_pages} pages
 - Tone: {prefs.tone or "no preference"}
 - Notes: {prefs.notes or "none"}
+- Phone number: {PHONE_INCLUDE if prefs.include_phone else PHONE_EXCLUDE}
 
 # Baseline resume
 
