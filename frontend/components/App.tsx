@@ -12,6 +12,7 @@ const APPEARANCE = {
     colorPrimary: "#38BDF8",
     colorBackground: "#111827",
     colorForeground: "#F1F5F9",
+    colorNeutral: "#F1F5F9",
     colorInput: "#090D16",
     colorInputForeground: "#F1F5F9",
   },

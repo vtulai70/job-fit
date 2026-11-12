@@ -26,6 +26,7 @@ Read `AGENTS.md` first: this NextJS version differs from older training data; it
 - All data comes from the backend via same-origin `/api/*` calls; Clerk's `__session` cookie authenticates them (no Authorization header needed)
 - Use `@clerk/react`, not `@clerk/nextjs` (which needs a Next.js server). Core 3 replaced `SignedIn`/`SignedOut` with `<Show when=...>`
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is inlined at build time (Docker build arg from `.env`); unit tests mock `@clerk/react`
+- Clerk components are themed via `appearance.variables` in `App.tsx`. On this dark theme `colorNeutral` must be light (`#F1F5F9`): Clerk defaults it to black and derives menu item text, borders and hovers from it, which made the account menu unreadable. `e2e/account-menu.spec.ts` guards this with a WCAG contrast check (>= 4.5)
 - Use Tailwind theme tokens, not raw hex: `canvas` `#090D16`, `surface` `#111827`, `line` `#1E293B`, `primary` `#38BDF8`, `accent` `#F59E0B`, `ink` `#F1F5F9`
 - Keep components small and simple; no emojis
 - In unit tests, stub `fetch` with `vi.stubGlobal` (auto-restored in `tests/setup.ts`)

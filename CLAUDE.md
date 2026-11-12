@@ -46,6 +46,7 @@ This project is for building a resume customizer App, which allows the user to c
 - Accent: `#F59E0B` (Amber 500) - Secondary highlights (e.g. the Generate button)
 - Text Primary:`#F1F5F9` (Slate 100) - Crisp, legible text against dark surfaces
 - Border / Divider: `#1E293B` (Slate 800) - Low-profile structural lines
+- Clerk sign-in and account menu use the same palette (`appearance.variables` in `frontend/components/App.tsx`); `colorNeutral` is set to the text color so Clerk's menu items stay legible on dark surfaces
 
 ## Coding standards
 
