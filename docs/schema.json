@@ -1,0 +1,59 @@
+{
+  "database": "sqlite",
+  "file": "data/jobfit.db",
+  "conventions": {
+    "timestamps": "TEXT, ISO-8601 UTC, e.g. 2026-11-11T21:58:51Z",
+    "foreign_keys": "PRAGMA foreign_keys = ON; child rows are deleted with their user (ON DELETE CASCADE)"
+  },
+  "tables": [
+    {
+      "name": "users",
+      "description": "One row per account. MVP seeds a single 'user'; Step 10 stores the Clerk user id in username.",
+      "columns": [
+        { "name": "id", "type": "INTEGER", "constraints": ["PRIMARY KEY"] },
+        { "name": "username", "type": "TEXT", "constraints": ["NOT NULL", "UNIQUE"] },
+        { "name": "created_at", "type": "TEXT", "constraints": ["NOT NULL"] }
+      ]
+    },
+    {
+      "name": "baseline_resumes",
+      "description": "The current baseline resume per user (at most one). Uploading replaces it.",
+      "columns": [
+        { "name": "user_id", "type": "INTEGER", "constraints": ["PRIMARY KEY", "REFERENCES users(id) ON DELETE CASCADE"] },
+        { "name": "content_md", "type": "TEXT", "constraints": ["NOT NULL"] },
+        { "name": "updated_at", "type": "TEXT", "constraints": ["NOT NULL"] }
+      ]
+    },
+    {
+      "name": "custom_resumes",
+      "description": "Download history: one row each time a custom resume is downloaded. The PDF is regenerated from content_md on re-download.",
+      "columns": [
+        { "name": "id", "type": "INTEGER", "constraints": ["PRIMARY KEY"] },
+        { "name": "user_id", "type": "INTEGER", "constraints": ["NOT NULL", "REFERENCES users(id) ON DELETE CASCADE"] },
+        { "name": "company", "type": "TEXT", "constraints": ["NOT NULL"] },
+        { "name": "job_description", "type": "TEXT", "constraints": ["NOT NULL"] },
+        { "name": "content_md", "type": "TEXT", "constraints": ["NOT NULL"] },
+        { "name": "style", "type": "TEXT", "constraints": ["NOT NULL"], "description": "PDF style used at download time" },
+        { "name": "downloaded_at", "type": "TEXT", "constraints": ["NOT NULL"] }
+      ],
+      "indexes": [
+        { "name": "idx_custom_resumes_user_downloaded", "columns": ["user_id", "downloaded_at"] }
+      ]
+    },
+    {
+      "name": "preferences",
+      "description": "User preferences as a JSON object (at most one row per user). Missing row means defaults.",
+      "columns": [
+        { "name": "user_id", "type": "INTEGER", "constraints": ["PRIMARY KEY", "REFERENCES users(id) ON DELETE CASCADE"] },
+        { "name": "data", "type": "TEXT", "constraints": ["NOT NULL"], "format": "JSON" },
+        { "name": "updated_at", "type": "TEXT", "constraints": ["NOT NULL"] }
+      ],
+      "data_shape": {
+        "style": { "type": "string", "enum": ["professional", "modern", "classic"], "default": "professional" },
+        "tone": { "type": "string", "default": "", "description": "Free text, e.g. 'concise, metrics-driven'" },
+        "max_pages": { "type": "integer", "default": 2 },
+        "notes": { "type": "string", "default": "", "description": "Anything else the AI should always consider" }
+      }
+    }
+  ]
+}
