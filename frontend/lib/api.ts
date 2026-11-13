@@ -2,6 +2,19 @@
 
 export type Style = "professional" | "modern" | "classic";
 
+/** Models the user can pick; the backend validates against the same list. First is the default. */
+export const MODELS = [
+  "openai/gpt-oss-120b",
+  "anthropic/claude-opus-5.5",
+  "anthropic/claude-haiku-5.5",
+  "anthropic/claude-sonnet-5.5",
+  "openai/gpt-6-sol",
+  "openai/gpt-5.4-nano",
+  "~google/gemini-pro-latest",
+] as const;
+
+export type Model = (typeof MODELS)[number];
+
 export type Preferences = {
   style: Style;
   tone: string;
@@ -10,6 +23,7 @@ export type Preferences = {
   include_phone: boolean;
   professional_years: number;
   earlier_years: number;
+  model: Model;
 };
 
 export type Baseline = { content_md: string | null; updated_at: string | null };
@@ -63,6 +77,9 @@ export async function downloadCustomResume(entry: NewHistoryEntry): Promise<Hist
 }
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
+
+/** A chat line shown in the sidebar; "info" lines are UI notes and are never sent to the AI. */
+export type ChatEntry = ChatMessage | { role: "info"; content: string };
 
 export type GenerateRequest = { job_description: string; message: string; history: ChatMessage[] };
 

@@ -8,6 +8,7 @@ function renderChat(overrides = {}) {
   const props = {
     messages: [],
     busy: false,
+    ready: true,
     canGenerate: true,
     onSend: vi.fn(),
     onGenerate: vi.fn(),
@@ -66,4 +67,23 @@ test("while busy, shows thinking and disables actions", async () => {
   expect(screen.getByRole("button", { name: "Generate custom resume" })).toBeDisabled();
   await userEvent.type(screen.getByLabelText("Message"), "hi");
   expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+});
+
+test("model notes render as plain lines without a speaker label", () => {
+  renderChat({
+    messages: [
+      { role: "info", content: "Model: anthropic/claude-haiku-5.5" },
+      { role: "user", content: "Tailor it" },
+    ],
+  });
+  const note = within(screen.getByRole("log", { name: "Conversation" })).getByText("Model: anthropic/claude-haiku-5.5");
+  expect(note).toHaveTextContent(/^Model: anthropic\/claude-haiku-5\.5$/);
+});
+
+test("before preferences load, generate and send are disabled", async () => {
+  const { onSend } = renderChat({ ready: false });
+  expect(screen.getByRole("button", { name: "Generate custom resume" })).toBeDisabled();
+  await userEvent.type(screen.getByLabelText("Message"), "hi{Enter}");
+  expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  expect(onSend).not.toHaveBeenCalled();
 });

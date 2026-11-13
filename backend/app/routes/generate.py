@@ -57,7 +57,6 @@ def build_messages(system: str, history: list[ChatMessage], message: str) -> lis
 @router.post("/generate")
 def generate(body: GenerateRequest, user_id: UserId, db: Db, client: Client) -> GenerateResult:
     """Ask the AI to tailor the baseline to the job, or to ask clarifying questions."""
-    system = build_system_prompt(
-        load_baseline(db, user_id), body.job_description, load_preferences(db, user_id), date.today().year
-    )
-    return ask_structured(client, build_messages(system, body.history, body.message), GenerateResult)
+    prefs = load_preferences(db, user_id)
+    system = build_system_prompt(load_baseline(db, user_id), body.job_description, prefs, date.today().year)
+    return ask_structured(client, build_messages(system, body.history, body.message), GenerateResult, prefs.model)

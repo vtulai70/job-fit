@@ -5,6 +5,7 @@ from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.ai import MODEL, Model
 from app.auth import UserId
 from app.db import Db, now
 
@@ -21,6 +22,7 @@ class Preferences(BaseModel):
     include_phone: bool = True
     professional_years: int = Field(default=15, ge=1, le=50)
     earlier_years: int = Field(default=10, ge=0, le=50)
+    model: Model = MODEL
 
 
 def load_preferences(db: Db, user_id: int) -> Preferences:

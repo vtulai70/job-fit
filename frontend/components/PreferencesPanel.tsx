@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { Preferences, Style } from "@/lib/api";
+import { MODELS, type Model, type Preferences, type Style } from "@/lib/api";
 
 type Props = { initial: Preferences; onSave: (prefs: Preferences) => Promise<void> };
 
@@ -57,6 +57,20 @@ export default function PreferencesPanel({ initial, onSave }: Props) {
           />
         </label>
       </div>
+      <label className="text-sm">
+        AI model
+        <select
+          value={prefs.model}
+          onChange={(e) => update({ model: e.target.value as Model })}
+          className={inputClass}
+        >
+          {MODELS.map((model) => (
+            <option key={model} value={model}>
+              {model}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <label>
           Professional Experience (years)

@@ -2,7 +2,8 @@ import pytest
 
 from app import db
 
-DEFAULTS = {"style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": True, "professional_years": 15, "earlier_years": 10}
+DEFAULTS = {"style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": True, "professional_years": 15, "earlier_years": 10,
+            "model": "openai/gpt-oss-120b"}
 
 
 def test_defaults_when_none_saved(signed_in):
@@ -13,7 +14,7 @@ def test_defaults_when_none_saved(signed_in):
 
 def test_put_then_get(signed_in):
     prefs = {"style": "modern", "tone": "concise", "max_pages": 1, "notes": "Highlight AI work", "include_phone": False,
-             "professional_years": 12, "earlier_years": 0}
+             "professional_years": 12, "earlier_years": 0, "model": "anthropic/claude-sonnet-5.5"}
     assert signed_in.put("/api/preferences", json=prefs).json() == prefs
     assert signed_in.get("/api/preferences").json() == prefs
 
@@ -67,3 +68,25 @@ def test_experience_years_out_of_range_rejected(signed_in, field, value):
 
 def test_earlier_years_zero_allowed(signed_in):
     assert signed_in.put("/api/preferences", json={"earlier_years": 0}).status_code == 200
+
+
+MODELS = [
+    "openai/gpt-oss-120b",
+    "anthropic/claude-opus-5.5",
+    "anthropic/claude-haiku-5.5",
+    "anthropic/claude-sonnet-5.5",
+    "openai/gpt-6-sol",
+    "openai/gpt-5.4-nano",
+    "~google/gemini-pro-latest",
+]
+
+
+@pytest.mark.parametrize("model", MODELS)
+def test_each_listed_model_can_be_saved(signed_in, model):
+    assert signed_in.put("/api/preferences", json={"model": model}).status_code == 200
+    assert signed_in.get("/api/preferences").json()["model"] == model
+
+
+@pytest.mark.parametrize("model", ["openai/gpt-4o", "", "anthropic/claude-opus-5-5"])
+def test_unlisted_model_rejected(signed_in, model):
+    assert signed_in.put("/api/preferences", json={"model": model}).status_code == 422

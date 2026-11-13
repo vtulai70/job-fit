@@ -41,6 +41,8 @@ test("preferences persist across reload", async ({ page }) => {
   await expect(page.getByLabel("Earlier Experience (years)")).toHaveValue("10");
   await page.getByLabel("Professional Experience (years)").fill("12");
   await page.getByLabel("Earlier Experience (years)").fill("6");
+  await expect(page.getByLabel("AI model")).toHaveValue("openai/gpt-oss-120b");
+  await page.getByLabel("AI model").selectOption("anthropic/claude-sonnet-5.5");
   await page.getByRole("button", { name: "Save preferences" }).click();
   await expect(page.getByText("Saved")).toBeVisible();
 
@@ -51,6 +53,7 @@ test("preferences persist across reload", async ({ page }) => {
   await expect(page.getByRole("checkbox", { name: "Include phone number in generated resume" })).not.toBeChecked();
   await expect(page.getByLabel("Professional Experience (years)")).toHaveValue("12");
   await expect(page.getByLabel("Earlier Experience (years)")).toHaveValue("6");
+  await expect(page.getByLabel("AI model")).toHaveValue("anthropic/claude-sonnet-5.5");
 });
 
 test("history entry is listed and re-downloads as PDF", async ({ page }) => {

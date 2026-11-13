@@ -2,18 +2,20 @@
 
 import { useState } from "react";
 
-import type { ChatMessage } from "@/lib/api";
+import type { ChatEntry } from "@/lib/api";
 
 type Props = {
-  messages: ChatMessage[];
+  messages: ChatEntry[];
   busy: boolean;
+  /** False until preferences (and so the chosen model) have loaded. */
+  ready: boolean;
   canGenerate: boolean;
   onSend: (text: string) => void;
   onGenerate: () => void;
 };
 
 /** AI chat: conversation, a one-click generate button and a free-text message box. */
-export default function ChatSidebar({ messages, busy, canGenerate, onSend, onGenerate }: Props) {
+export default function ChatSidebar({ messages, busy, ready, canGenerate, onSend, onGenerate }: Props) {
   const [text, setText] = useState("");
 
   function submit(event: React.FormEvent) {
@@ -27,7 +29,7 @@ export default function ChatSidebar({ messages, busy, canGenerate, onSend, onGen
       <h2 className="mb-2 font-semibold">AI assistant</h2>
       <button
         onClick={onGenerate}
-        disabled={!canGenerate || busy}
+        disabled={!ready || !canGenerate || busy}
         title={canGenerate ? undefined : "Upload a baseline resume and paste a job description first"}
         className="mb-3 rounded bg-accent py-2 text-sm font-semibold text-canvas disabled:opacity-40"
       >
@@ -37,15 +39,21 @@ export default function ChatSidebar({ messages, busy, canGenerate, onSend, onGen
         {messages.length === 0 && (
           <p className="text-ink/60">Ask anything about tailoring your resume.</p>
         )}
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`whitespace-pre-wrap rounded p-2 ${m.role === "user" ? "self-end bg-primary/15" : "bg-canvas"}`}
-          >
-            <span className="sr-only">{m.role === "user" ? "You: " : "AI: "}</span>
-            {m.content}
-          </div>
-        ))}
+        {messages.map((m, i) =>
+          m.role === "info" ? (
+            <p key={i} className="text-center text-xs text-ink/60">
+              {m.content}
+            </p>
+          ) : (
+            <div
+              key={i}
+              className={`whitespace-pre-wrap rounded p-2 ${m.role === "user" ? "self-end bg-primary/15" : "bg-canvas"}`}
+            >
+              <span className="sr-only">{m.role === "user" ? "You: " : "AI: "}</span>
+              {m.content}
+            </div>
+          ),
+        )}
         {busy && <p className="text-ink/60">Thinking...</p>}
       </div>
       <form onSubmit={submit} className="mt-4 flex gap-2">
@@ -58,7 +66,7 @@ export default function ChatSidebar({ messages, busy, canGenerate, onSend, onGen
         />
         <button
           type="submit"
-          disabled={busy || !text.trim()}
+          disabled={!ready || busy || !text.trim()}
           className="rounded bg-primary px-3 text-sm font-semibold text-canvas disabled:opacity-40"
         >
           Send

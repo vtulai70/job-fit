@@ -1,7 +1,7 @@
 """OpenRouter access through the OpenAI SDK."""
 
 import os
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
 from openai import OpenAI
@@ -10,7 +10,16 @@ from pydantic import BaseModel
 from app.auth import CurrentUser
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1"
-MODEL = "openai/gpt-oss-120b"
+Model = Literal[
+    "openai/gpt-oss-120b",
+    "anthropic/claude-opus-5.5",
+    "anthropic/claude-haiku-5.5",
+    "anthropic/claude-sonnet-5.5",
+    "openai/gpt-6-sol",
+    "openai/gpt-5.4-nano",
+    "~google/gemini-pro-latest",
+]
+MODEL: Model = "openai/gpt-oss-120b"
 
 router = APIRouter(prefix="/api/ai")
 
@@ -31,13 +40,13 @@ def ask(client: OpenAI, question: str) -> str:
     return completion.choices[0].message.content
 
 
-def ask_structured[T: BaseModel](client: OpenAI, messages: list[dict], schema: type[T]) -> T:
+def ask_structured[T: BaseModel](client: OpenAI, messages: list[dict], schema: type[T], model: str = MODEL) -> T:
     """Chat completion parsed into a Pydantic model (Structured Outputs).
 
     require_parameters routes only to OpenRouter providers that support response_format.
     """
     completion = client.chat.completions.parse(
-        model=MODEL,
+        model=model,
         messages=messages,
         response_format=schema,
         extra_body={"provider": {"require_parameters": True}},

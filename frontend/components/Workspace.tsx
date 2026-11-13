@@ -20,7 +20,7 @@ export default function Workspace() {
   const [customResume, setCustomResume] = useState<CustomResumeData | null>(null);
   const [history, setHistory] = useState<api.HistoryEntry[]>([]);
   const [prefs, setPrefs] = useState<api.Preferences | null>(null);
-  const [messages, setMessages] = useState<api.ChatMessage[]>([]);
+  const [messages, setMessages] = useState<api.ChatEntry[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -37,22 +37,24 @@ export default function Workspace() {
     setPrefs(await api.putPreferences(next));
   }
 
+  /** Show which model will answer, then send the message with the AI conversation so far. */
   async function send(text: string) {
-    const prior = messages;
-    setMessages([...prior, { role: "user", content: text }]);
+    const sent: api.ChatEntry[] = [
+      ...messages,
+      { role: "info", content: `Model: ${prefs!.model}` },
+      { role: "user", content: text },
+    ];
+    const history = messages.filter((m): m is api.ChatMessage => m.role !== "info");
+    setMessages(sent);
     setBusy(true);
     try {
-      const result = await api.generate({ job_description: jobDescription, message: text, history: prior });
-      setMessages([...prior, { role: "user", content: text }, { role: "assistant", content: result.reply }]);
+      const result = await api.generate({ job_description: jobDescription, message: text, history });
+      setMessages([...sent, { role: "assistant", content: result.reply }]);
       if (result.resume_md) {
         setCustomResume({ company: result.company ?? "Unknown company", content_md: result.resume_md });
       }
     } catch {
-      setMessages([
-        ...prior,
-        { role: "user", content: text },
-        { role: "assistant", content: "Sorry, something went wrong. Please try again." },
-      ]);
+      setMessages([...sent, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
     } finally {
       setBusy(false);
     }
@@ -84,6 +86,7 @@ export default function Workspace() {
       <ChatSidebar
         messages={messages}
         busy={busy}
+        ready={prefs !== null}
         canGenerate={Boolean(baseline && jobDescription.trim())}
         onSend={send}
         onGenerate={() => send(GENERATE_MESSAGE)}

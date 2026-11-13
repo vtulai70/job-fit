@@ -14,6 +14,7 @@ const PREFS = {
   include_phone: true,
   professional_years: 15,
   earlier_years: 10,
+  model: "openai/gpt-oss-120b",
 };
 const HISTORY = [{ id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z" }];
 
@@ -272,4 +273,58 @@ test("saving experience years sends them to the API", async () => {
   expect(await screen.findByText("Saved")).toBeInTheDocument();
   const put = fetchMock.mock.calls.find(([url, init]) => url === "/api/preferences" && init?.method === "PUT")!;
   expect(JSON.parse(put[1]!.body as string)).toEqual({ ...PREFS, professional_years: 8 });
+});
+
+function chatLines() {
+  return [...screen.getByRole("log", { name: "Conversation" }).children].map((el) => el.textContent);
+}
+
+test("the model is shown in the chat before the generate prompt", async () => {
+  mockChat({ body: RESUME_RESULT });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await screen.findByText("Here is your resume.");
+  expect(chatLines()).toEqual([
+    "Model: openai/gpt-oss-120b",
+    `You: ${GENERATE_MESSAGE}`,
+    "AI: Here is your resume.",
+  ]);
+});
+
+test("the model note shows the saved model and is not sent to the AI", async () => {
+  const fetchMock = mockChat({ body: QUESTION_RESULT }, { body: RESUME_RESULT });
+  const base = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
+    url === "/api/preferences" && init?.method === "GET"
+      ? Response.json({ ...PREFS, model: "anthropic/claude-haiku-5.5" })
+      : base(url, init),
+  );
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await screen.findByText("Which team size should I emphasize?");
+  await userEvent.type(screen.getByLabelText("Message"), "Teams of 40{Enter}");
+  await screen.findByText("Here is your resume.");
+
+  expect(screen.getAllByText("Model: anthropic/claude-haiku-5.5")).toHaveLength(2);
+  expect(generateBodies(fetchMock)[1].history).toEqual([
+    { role: "user", content: GENERATE_MESSAGE },
+    { role: "assistant", content: "Which team size should I emphasize?" },
+  ]);
+});
+
+test("after saving a different model the next generate names it", async () => {
+  mockChat({ body: RESUME_RESULT });
+  const fetchMock = vi.mocked(fetch);
+  const base = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url, init) =>
+    url === "/api/preferences" && init?.method === "PUT"
+      ? Response.json(JSON.parse(init.body as string))
+      : base(url as string, init),
+  );
+  await ready();
+  await userEvent.selectOptions(screen.getByLabelText("AI model"), "openai/gpt-5.4-nano");
+  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+  await screen.findByText("Saved");
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  expect(await screen.findByText("Model: openai/gpt-5.4-nano")).toBeInTheDocument();
 });

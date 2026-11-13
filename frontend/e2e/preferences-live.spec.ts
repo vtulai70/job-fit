@@ -26,6 +26,7 @@ test("saved preferences shape the real generated resume", async ({ page }) => {
 
   await page.getByLabel("Job description").fill(JOB);
   await page.getByRole("button", { name: "Generate custom resume" }).click();
+  await expect(page.getByRole("log", { name: "Conversation" }).getByText("Model: openai/gpt-oss-120b")).toBeVisible();
   const editor = page.getByLabel("Custom resume content");
   await expect(editor).toBeVisible({ timeout: 150_000 });
 

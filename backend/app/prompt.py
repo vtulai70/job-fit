@@ -36,7 +36,9 @@ Tailor the user's baseline resume to the target job description to maximize the 
   that falls inside one of those windows.
 - Only include licenses and certifications relevant to the job description.
 - Follow the user's preferences below.
-- Never invent employers, titles, dates, degrees or metrics.
+- Do not invent experience entries: every role in the resume must be a role from the baseline resume,
+  with its original title, company and dates. Never merge, split or add roles.
+- Never invent employers, titles, dates, degrees, accomplishments or metrics.
 
 # Output
 
@@ -70,7 +72,9 @@ def experience_rules(prefs: Preferences, year: int) -> str:
     if prefs.earlier_years:
         rules.append(
             f'- "## Earlier Experience" section: every role that ended between {earlier_from} and '
-            f"{professional_from - 1}, condensed to company, title, dates and at most 2 short bullets."
+            f"{professional_from - 1}. Each entry is one Markdown list item with only the role, company name "
+            'and years, e.g. "- Lead Software Designer, Nokia, 2004 - 2007". No sub-bullets, descriptions, '
+            "locations, months or any other details."
         )
     rules.append(
         f"- Leave out every role that ended before {earlier_from}"

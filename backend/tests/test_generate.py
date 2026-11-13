@@ -6,8 +6,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from app import ai
+from app.ai import Model
 from app.main import app
 from datetime import date
+from typing import get_args
 
 from app.prompt import build_system_prompt, experience_rules
 from app.routes.generate import ChatMessage, GenerateResult, build_messages
@@ -71,8 +73,15 @@ def test_experience_rules_default_windows():
     rules = experience_rules(Preferences(), 2026)
     assert "Professional Experience\" section: every role that ended in 2011 or later" in rules
     assert "Earlier Experience\" section: every role that ended between 2001 and 2010" in rules
-    assert "at most 2 short bullets" in rules
+    assert "only the role, company name and years" in rules
+    assert "one Markdown list item" in rules
+    assert "No sub-bullets" in rules
     assert "Leave out every role that ended before 2001." in rules
+
+
+def test_system_prompt_forbids_invented_experience_entries():
+    prompt = build_system_prompt("# Me", "Job", Preferences(), 2026)
+    assert "Do not invent experience entries" in prompt
 
 
 def test_experience_rules_custom_windows():
@@ -118,6 +127,25 @@ def test_ask_structured_requests_schema_and_capable_provider():
     assert kwargs["model"] == "openai/gpt-oss-120b"
     assert kwargs["response_format"] is GenerateResult
     assert kwargs["extra_body"] == {"provider": {"require_parameters": True}}
+
+
+def test_ask_structured_uses_given_model():
+    client = fake_client(RESUME_RESULT)
+    ai.ask_structured(client, [{"role": "user", "content": "x"}], GenerateResult, "anthropic/claude-haiku-5.5")
+    assert client.chat.completions.parse.call_args.kwargs["model"] == "anthropic/claude-haiku-5.5"
+
+
+def test_generate_uses_default_model_when_none_saved(signed_in, use_ai):
+    client = use_ai(RESUME_RESULT)
+    signed_in.post("/api/generate", json={"job_description": "Job", "message": "go"})
+    assert client.chat.completions.parse.call_args.kwargs["model"] == "openai/gpt-oss-120b"
+
+
+def test_generate_uses_saved_model(signed_in, use_ai):
+    signed_in.put("/api/preferences", json={"model": "~google/gemini-pro-latest"})
+    client = use_ai(RESUME_RESULT)
+    signed_in.post("/api/generate", json={"job_description": "Job", "message": "go"})
+    assert client.chat.completions.parse.call_args.kwargs["model"] == "~google/gemini-pro-latest"
 
 
 def test_generate_uses_stored_baseline_preferences_and_history(signed_in, use_ai):
@@ -245,7 +273,9 @@ def test_real_generation_default_experience_windows():
         assert text in earlier, text
     assert "ct technologies" in earlier.lower()
     assert "Intrinsyc" not in professional
-    assert len(re.findall(r"^\s*[-*] ", earlier, re.M)) <= 6
+    entries = [line for line in earlier.splitlines()[1:] if line.strip() and line.strip() != "---"]
+    assert len(entries) == 3, entries
+    assert all(re.match(r"\s*[-*] \S", line) for line in entries), entries
     for name in OMITTED:
         assert name.lower() not in md.lower(), name
 
@@ -260,3 +290,18 @@ def test_real_generation_custom_experience_windows():
     assert section(md, "Earlier Experience") == ""
     for name in ["HERE Technologies", "Nokia", "Intrinsyc", "Senior Product Manager"]:
         assert name not in md, name
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("model", get_args(Model))
+def test_real_generation_with_each_model(model):
+    """Every selectable model returns our structured result and follows the preferences."""
+    prefs = Preferences(professional_years=5, earlier_years=0, include_phone=False, model=model)
+    system = build_system_prompt(RESUME, JOB, prefs, 2026)
+    message = "Generate my custom resume now. Do not ask questions."
+    result = ai.ask_structured(ai.get_client(), build_messages(system, [], message), GenerateResult, prefs.model)
+    md = result.resume_md
+    assert md and "Director, Software Engineering" in section(md, "Professional Experience")
+    assert section(md, "Earlier Experience") == ""
+    assert "Nokia" not in md
+    assert PHONE_DIGITS not in digits(md)

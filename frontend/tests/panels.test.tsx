@@ -14,6 +14,7 @@ const PREFS: Preferences = {
   include_phone: true,
   professional_years: 15,
   earlier_years: 10,
+  model: "openai/gpt-oss-120b",
 };
 
 test("history shows empty state", () => {
@@ -62,6 +63,7 @@ test("preferences form saves edited values and confirms", async () => {
     include_phone: true,
     professional_years: 15,
     earlier_years: 10,
+    model: "openai/gpt-oss-120b",
   });
   expect(await screen.findByText("Saved")).toBeInTheDocument();
 });
@@ -123,4 +125,34 @@ test("editing experience years saves numbers", async () => {
   await userEvent.type(screen.getByLabelText("Earlier Experience (years)"), "5");
   await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
   expect(onSave).toHaveBeenCalledWith({ ...PREFS, professional_years: 20, earlier_years: 5 });
+});
+
+const MODELS = [
+  "openai/gpt-oss-120b",
+  "anthropic/claude-opus-5.5",
+  "anthropic/claude-haiku-5.5",
+  "anthropic/claude-sonnet-5.5",
+  "openai/gpt-6-sol",
+  "openai/gpt-5.4-nano",
+  "~google/gemini-pro-latest",
+];
+
+test("model select lists every model, default first", () => {
+  render(<PreferencesPanel initial={PREFS} onSave={vi.fn()} />);
+  const select = screen.getByLabelText("AI model");
+  expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(MODELS);
+  expect(select).toHaveValue("openai/gpt-oss-120b");
+});
+
+test("model select shows the saved model", () => {
+  render(<PreferencesPanel initial={{ ...PREFS, model: "openai/gpt-6-sol" }} onSave={vi.fn()} />);
+  expect(screen.getByLabelText("AI model")).toHaveValue("openai/gpt-6-sol");
+});
+
+test("choosing a model saves it", async () => {
+  const onSave = vi.fn().mockResolvedValue(undefined);
+  render(<PreferencesPanel initial={PREFS} onSave={onSave} />);
+  await userEvent.selectOptions(screen.getByLabelText("AI model"), "anthropic/claude-sonnet-5.5");
+  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+  expect(onSave).toHaveBeenCalledWith({ ...PREFS, model: "anthropic/claude-sonnet-5.5" });
 });

@@ -74,6 +74,36 @@ test("clarifying question is answered in chat before the resume", async ({ page 
   expect((bodies[1].history as unknown[]).length).toBe(2);
 });
 
+test("chat names the saved model before each prompt it sends", async ({ page }) => {
+  await mockGenerate(page, [
+    { reply: "Which focus?", company: "Umbrella Corp", resume_md: null },
+    { reply: "Done.", company: "Umbrella Corp", resume_md: TAILORED },
+  ]);
+  await prepare(page);
+  await page.getByLabel("AI model").selectOption("openai/gpt-5.4-nano");
+  await page.getByRole("button", { name: "Save preferences" }).click();
+  await expect(page.getByText("Saved")).toBeVisible();
+
+  await page.getByRole("button", { name: "Generate custom resume" }).click();
+  const chat = page.getByRole("log", { name: "Conversation" });
+  await expect(chat.getByText("Which focus?")).toBeVisible();
+  await page.getByLabel("AI model").selectOption("openai/gpt-oss-120b");
+  await page.getByRole("button", { name: "Save preferences" }).click();
+  await expect(page.getByText("Saved")).toBeVisible();
+  await page.getByLabel("Message").fill("Platform");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(chat.getByText("Done.")).toBeVisible();
+
+  await expect(chat.locator(":scope > *")).toHaveText([
+    "Model: openai/gpt-5.4-nano",
+    "You: Please generate my custom resume for this job description.",
+    "AI: Which focus?",
+    "Model: openai/gpt-oss-120b",
+    "You: Platform",
+    "AI: Done.",
+  ]);
+});
+
 test("generate button is disabled until a job description is pasted", async ({ page }) => {
   await signIn(page);
   await page.locator('input[type="file"]').setInputFiles(RESUME);
