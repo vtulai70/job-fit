@@ -39,23 +39,27 @@ test("history lists entries with re-download links", () => {
   expect(screen.getByRole("link", { name: "Download Acme resume" })).toHaveAttribute("href", "/api/history/1/pdf");
 });
 
+test("preferences have no save button", () => {
+  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  expect(screen.queryByRole("button")).not.toBeInTheDocument();
+});
+
 test("preferences form shows initial values", () => {
-  render(<PreferencesPanel initial={{ ...PREFS, tone: "bold" }} onSave={vi.fn()} />);
+  render(<PreferencesPanel initial={{ ...PREFS, tone: "bold" }} onChange={vi.fn()} />);
   expect(screen.getByLabelText("PDF style")).toHaveValue("professional");
   expect(screen.getByLabelText("Max pages")).toHaveValue(2);
   expect(screen.getByLabelText("Tone")).toHaveValue("bold");
 });
 
-test("preferences form saves edited values and confirms", async () => {
-  const onSave = vi.fn().mockResolvedValue(undefined);
-  render(<PreferencesPanel initial={PREFS} onSave={onSave} />);
+test("every edit reports the full preferences", async () => {
+  const onChange = vi.fn();
+  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
   await userEvent.selectOptions(screen.getByLabelText("PDF style"), "classic");
   await userEvent.clear(screen.getByLabelText("Max pages"));
   await userEvent.type(screen.getByLabelText("Max pages"), "3");
   await userEvent.type(screen.getByLabelText("Tone"), "concise");
   await userEvent.type(screen.getByLabelText("Notes for the AI"), "Lead with AI");
-  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  expect(onSave).toHaveBeenCalledWith({
+  expect(onChange).toHaveBeenLastCalledWith({
     style: "classic",
     max_pages: 3,
     tone: "concise",
@@ -65,49 +69,31 @@ test("preferences form saves edited values and confirms", async () => {
     earlier_years: 10,
     model: "openai/gpt-oss-120b",
   });
-  expect(await screen.findByText("Saved")).toBeInTheDocument();
-});
-
-test("editing after save clears the confirmation", async () => {
-  render(<PreferencesPanel initial={PREFS} onSave={vi.fn().mockResolvedValue(undefined)} />);
-  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  expect(await screen.findByText("Saved")).toBeInTheDocument();
-  await userEvent.type(screen.getByLabelText("Tone"), "x");
-  expect(screen.queryByText("Saved")).not.toBeInTheDocument();
 });
 
 test("phone checkbox reflects the saved preference", () => {
-  const { unmount } = render(<PreferencesPanel initial={PREFS} onSave={vi.fn()} />);
+  const { unmount } = render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
   expect(screen.getByRole("checkbox", { name: "Include phone number in generated resume" })).toBeChecked();
   unmount();
-  render(<PreferencesPanel initial={{ ...PREFS, include_phone: false }} onSave={vi.fn()} />);
+  render(<PreferencesPanel initial={{ ...PREFS, include_phone: false }} onChange={vi.fn()} />);
   expect(screen.getByRole("checkbox", { name: "Include phone number in generated resume" })).not.toBeChecked();
 });
 
 test("unchecking the phone option saves include_phone false", async () => {
-  const onSave = vi.fn().mockResolvedValue(undefined);
-  render(<PreferencesPanel initial={PREFS} onSave={onSave} />);
+  const onChange = vi.fn();
+  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
   await userEvent.click(screen.getByRole("checkbox", { name: "Include phone number in generated resume" }));
-  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  expect(onSave).toHaveBeenCalledWith({ ...PREFS, include_phone: false });
-});
-
-test("toggling the phone option clears the saved confirmation", async () => {
-  render(<PreferencesPanel initial={PREFS} onSave={vi.fn().mockResolvedValue(undefined)} />);
-  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  expect(await screen.findByText("Saved")).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("checkbox", { name: "Include phone number in generated resume" }));
-  expect(screen.queryByText("Saved")).not.toBeInTheDocument();
+  expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, include_phone: false });
 });
 
 test("experience year fields show the saved values", () => {
-  render(<PreferencesPanel initial={{ ...PREFS, professional_years: 12, earlier_years: 0 }} onSave={vi.fn()} />);
+  render(<PreferencesPanel initial={{ ...PREFS, professional_years: 12, earlier_years: 0 }} onChange={vi.fn()} />);
   expect(screen.getByLabelText("Professional Experience (years)")).toHaveValue(12);
   expect(screen.getByLabelText("Earlier Experience (years)")).toHaveValue(0);
 });
 
 test("experience year fields have sensible limits", () => {
-  render(<PreferencesPanel initial={PREFS} onSave={vi.fn()} />);
+  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
   const professional = screen.getByLabelText("Professional Experience (years)");
   const earlier = screen.getByLabelText("Earlier Experience (years)");
   expect(professional).toHaveAttribute("min", "1");
@@ -117,14 +103,13 @@ test("experience year fields have sensible limits", () => {
 });
 
 test("editing experience years saves numbers", async () => {
-  const onSave = vi.fn().mockResolvedValue(undefined);
-  render(<PreferencesPanel initial={PREFS} onSave={onSave} />);
+  const onChange = vi.fn();
+  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
   await userEvent.clear(screen.getByLabelText("Professional Experience (years)"));
   await userEvent.type(screen.getByLabelText("Professional Experience (years)"), "20");
   await userEvent.clear(screen.getByLabelText("Earlier Experience (years)"));
   await userEvent.type(screen.getByLabelText("Earlier Experience (years)"), "5");
-  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  expect(onSave).toHaveBeenCalledWith({ ...PREFS, professional_years: 20, earlier_years: 5 });
+  expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, professional_years: 20, earlier_years: 5 });
 });
 
 const MODELS = [
@@ -138,21 +123,20 @@ const MODELS = [
 ];
 
 test("model select lists every model, default first", () => {
-  render(<PreferencesPanel initial={PREFS} onSave={vi.fn()} />);
+  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
   const select = screen.getByLabelText("AI model");
   expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(MODELS);
   expect(select).toHaveValue("openai/gpt-oss-120b");
 });
 
 test("model select shows the saved model", () => {
-  render(<PreferencesPanel initial={{ ...PREFS, model: "openai/gpt-6-sol" }} onSave={vi.fn()} />);
+  render(<PreferencesPanel initial={{ ...PREFS, model: "openai/gpt-6-sol" }} onChange={vi.fn()} />);
   expect(screen.getByLabelText("AI model")).toHaveValue("openai/gpt-6-sol");
 });
 
 test("choosing a model saves it", async () => {
-  const onSave = vi.fn().mockResolvedValue(undefined);
-  render(<PreferencesPanel initial={PREFS} onSave={onSave} />);
+  const onChange = vi.fn();
+  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
   await userEvent.selectOptions(screen.getByLabelText("AI model"), "anthropic/claude-sonnet-5.5");
-  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  expect(onSave).toHaveBeenCalledWith({ ...PREFS, model: "anthropic/claude-sonnet-5.5" });
+  expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, model: "anthropic/claude-sonnet-5.5" });
 });

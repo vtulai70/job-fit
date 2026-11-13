@@ -42,9 +42,11 @@ test("preferences persist across reload", async ({ page }) => {
   await page.getByLabel("Professional Experience (years)").fill("12");
   await page.getByLabel("Earlier Experience (years)").fill("6");
   await expect(page.getByLabel("AI model")).toHaveValue("openai/gpt-oss-120b");
+  const lastSave = page.waitForResponse(
+    (r) => r.url().endsWith("/api/preferences") && r.request().postDataJSON()?.model === "anthropic/claude-sonnet-5.5",
+  );
   await page.getByLabel("AI model").selectOption("anthropic/claude-sonnet-5.5");
-  await page.getByRole("button", { name: "Save preferences" }).click();
-  await expect(page.getByText("Saved")).toBeVisible();
+  expect((await lastSave).ok()).toBe(true);
 
   await page.reload();
   await expect(page.getByLabel("PDF style")).toHaveValue("classic");
@@ -75,7 +77,7 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
   const downloadPromise = page.waitForEvent("download");
   await history.getByRole("link", { name: "Download Globex Corporation resume" }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("Resume - Voicu Tulai's resume - Globex Corporation.pdf");
+  expect(download.suggestedFilename()).toBe("Resume - Voicu Tulai - Globex Corporation.pdf");
   const pdf = await readFile(await download.path());
   expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
 });

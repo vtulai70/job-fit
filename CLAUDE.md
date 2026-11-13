@@ -7,10 +7,10 @@ This project is for building a resume customizer App, which allows the user to c
 - When signed in, the user can upload or update the baseline resume, paste the job description, generate the custom resume, and optionally download this as PDF
 - The generated custom resume is editable in the UI; Download PDF always uses the edited text, and that edited text is what is saved to the database
 - The baseline resume and user preferences (PDF style, AI model, tone, max pages, notes for the AI, include/exclude phone number, Professional Experience years, Earlier Experience years) are persisted
-- Preferences are sent to the AI with the baseline resume and job description on every generation; unchecking "Include phone number in generated resume" removes the phone number from the generated resume (preferences must be saved to take effect)
+- Preferences are saved automatically on every change (there is no Save button) and sent to the AI with the baseline resume and job description on every generation; a generation waits for pending preference saves. Unchecking "Include phone number in generated resume" removes the phone number from the generated resume
 - Experience windows: roles that ended within the last "Professional Experience (years)" (default 15) go in a "Professional Experience" section with full detail; roles that ended in the "Earlier Experience (years)" before that (default 10) go in an "Earlier Experience" section with one list item per role (role, company name and years only, no other details); older roles are left out. A role is placed by its end year; 0 earlier years means no Earlier Experience section
 - The custom resumes are persisted when downloaded. The company, PDF style and download timestamp are also persisted.
-- The PDF file is named `Resume - <name> - <company>.pdf`, the name taken from the custom resume's top `# ` heading (left out if there is none; characters not allowed in file names are dropped)
+- The PDF file is named `Resume - <name> - <company>.pdf` (set by the backend via `Content-Disposition`). The name is the custom resume's first `# ` heading; the company is the one the AI extracted ("Unknown company" when it returns none). Characters not allowed in file names are replaced and whitespace collapsed; an empty part is left out
 - The user has an option to see the custom resume history, and be able to re-download the PDF for any of these
 - AI model preference: `openai/gpt-oss-120b` (default), `anthropic/claude-opus-5.5`, `anthropic/claude-haiku-5.5`, `anthropic/claude-sonnet-5.5`, `openai/gpt-6-sol`, `openai/gpt-5.4-nano`, `~google/gemini-pro-latest`. The saved model generates the resume; the chat shows a "Model: <id>" line before each prompt it sends (that line is not sent to the AI)
 - There is an AI chat feature in a sidebar; the AI is able to ask clarifying questions before generating the final custom resume. A "Generate custom resume" button starts it once a baseline and job description exist
@@ -38,7 +38,7 @@ This project is for building a resume customizer App, which allows the user to c
 
 - `backend/` - FastAPI app; see `backend/CLAUDE.md`
 - `frontend/` - NextJS app; see `frontend/CLAUDE.md`
-- `scripts/start.sh` / `scripts/stop.sh` (and `.ps1`) - build and run the app at http://localhost:8000
+- `scripts/start.sh` / `scripts/stop.sh` (and `.ps1`) - build and run the app at http://localhost:8000; rerun `start.sh` after code changes, the container does not pick them up otherwise
 - Tests: `cd backend && uv run pytest`; `cd frontend && npm test`; `cd frontend && npm run test:e2e` (throwaway container on port 8001, two Clerk test users)
 - macOS: backend needs `brew install pango` for WeasyPrint
 

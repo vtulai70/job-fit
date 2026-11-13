@@ -21,8 +21,6 @@ test("saved preferences shape the real generated resume", async ({ page }) => {
   await page.getByRole("checkbox", { name: "Include phone number in generated resume" }).uncheck();
   await page.getByLabel("Professional Experience (years)").fill("5");
   await page.getByLabel("Earlier Experience (years)").fill("0");
-  await page.getByRole("button", { name: "Save preferences" }).click();
-  await expect(page.getByText("Saved")).toBeVisible();
 
   await page.getByLabel("Job description").fill(JOB);
   await page.getByRole("button", { name: "Generate custom resume" }).click();

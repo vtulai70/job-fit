@@ -81,15 +81,11 @@ test("chat names the saved model before each prompt it sends", async ({ page }) 
   ]);
   await prepare(page);
   await page.getByLabel("AI model").selectOption("openai/gpt-5.4-nano");
-  await page.getByRole("button", { name: "Save preferences" }).click();
-  await expect(page.getByText("Saved")).toBeVisible();
 
   await page.getByRole("button", { name: "Generate custom resume" }).click();
   const chat = page.getByRole("log", { name: "Conversation" });
   await expect(chat.getByText("Which focus?")).toBeVisible();
   await page.getByLabel("AI model").selectOption("openai/gpt-oss-120b");
-  await page.getByRole("button", { name: "Save preferences" }).click();
-  await expect(page.getByText("Saved")).toBeVisible();
   await page.getByLabel("Message").fill("Platform");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(chat.getByText("Done.")).toBeVisible();

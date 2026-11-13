@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import * as api from "@/lib/api";
 
@@ -13,7 +13,7 @@ import ResumePanel from "./ResumePanel";
 
 export const GENERATE_MESSAGE = "Please generate my custom resume for this job description.";
 
-/** Signed-in workspace: loads and saves the user's data and runs the AI chat. */
+/** Signed-in workspace: loads and saves the user's data and runs the AI chat (after pending preference saves). */
 export default function Workspace() {
   const [baseline, setBaseline] = useState<string | null>(null);
   const [jobDescription, setJobDescription] = useState("");
@@ -22,6 +22,7 @@ export default function Workspace() {
   const [prefs, setPrefs] = useState<api.Preferences | null>(null);
   const [messages, setMessages] = useState<api.ChatEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  const prefsSaved = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
     api.getBaseline().then((b) => setBaseline(b.content_md));
@@ -33,8 +34,10 @@ export default function Workspace() {
     setBaseline((await api.putBaseline(content)).content_md);
   }
 
-  async function savePreferences(next: api.Preferences) {
-    setPrefs(await api.putPreferences(next));
+  /** Save each change in order; a failed save does not block later ones. */
+  function savePreferences(next: api.Preferences) {
+    setPrefs(next);
+    prefsSaved.current = prefsSaved.current.catch(() => {}).then(() => api.putPreferences(next));
   }
 
   /** Show which model will answer, then send the message with the AI conversation so far. */
@@ -48,6 +51,7 @@ export default function Workspace() {
     setMessages(sent);
     setBusy(true);
     try {
+      await prefsSaved.current;
       const result = await api.generate({ job_description: jobDescription, message: text, history });
       setMessages([...sent, { role: "assistant", content: result.reply }]);
       if (result.resume_md) {
@@ -81,7 +85,7 @@ export default function Workspace() {
         <JobDescription value={jobDescription} onChange={setJobDescription} />
         <CustomResume resume={customResume} onChange={editCustomResume} onDownload={downloadCustomResume} />
         <HistoryPanel entries={history} />
-        {prefs && <PreferencesPanel initial={prefs} onSave={savePreferences} />}
+        {prefs && <PreferencesPanel initial={prefs} onChange={savePreferences} />}
       </main>
       <ChatSidebar
         messages={messages}

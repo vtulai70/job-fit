@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
@@ -56,14 +56,11 @@ test("uploading a resume saves it and shows the saved content", async () => {
   expect(JSON.parse(put[1]!.body as string)).toEqual({ content_md: "# New resume" });
 });
 
-test("saving preferences sends them to the API", async () => {
+test("changing a preference saves it without a button", async () => {
   const fetchMock = mockData();
   render(<Workspace />);
   await userEvent.selectOptions(await screen.findByLabelText("PDF style"), "classic");
-  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  expect(await screen.findByText("Saved")).toBeInTheDocument();
-  const put = fetchMock.mock.calls.find(([url, init]) => url === "/api/preferences" && init?.method === "PUT")!;
-  expect(JSON.parse(put[1]!.body as string)).toEqual({ ...PREFS, style: "classic" });
+  await waitFor(() => expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, style: "classic" }));
 });
 
 test("job description is kept as typed", async () => {
@@ -92,6 +89,11 @@ function generateBodies(fetchMock: ReturnType<typeof mockData>) {
   return fetchMock.mock.calls
     .filter(([url]) => url === "/api/generate")
     .map(([, init]) => JSON.parse(init!.body as string));
+}
+
+function lastPreferencesPut(fetchMock: ReturnType<typeof mockData>) {
+  const puts = fetchMock.mock.calls.filter(([url, init]) => url === "/api/preferences" && init?.method === "PUT");
+  return JSON.parse(puts.at(-1)![1]!.body as string);
 }
 
 async function ready() {
@@ -253,26 +255,20 @@ test("clearing the resume disables download", async () => {
   expect(screen.getByRole("button", { name: "Download PDF" })).toBeDisabled();
 });
 
-test("saving the phone option sends include_phone to the API", async () => {
+test("changing the phone option saves include_phone", async () => {
   const fetchMock = mockData();
   render(<Workspace />);
   await userEvent.click(await screen.findByRole("checkbox", { name: "Include phone number in generated resume" }));
-  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  expect(await screen.findByText("Saved")).toBeInTheDocument();
-  const put = fetchMock.mock.calls.find(([url, init]) => url === "/api/preferences" && init?.method === "PUT")!;
-  expect(JSON.parse(put[1]!.body as string)).toEqual({ ...PREFS, include_phone: false });
+  await waitFor(() => expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, include_phone: false }));
 });
 
-test("saving experience years sends them to the API", async () => {
+test("changing experience years saves them", async () => {
   const fetchMock = mockData();
   render(<Workspace />);
   const professional = await screen.findByLabelText("Professional Experience (years)");
   await userEvent.clear(professional);
   await userEvent.type(professional, "8");
-  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  expect(await screen.findByText("Saved")).toBeInTheDocument();
-  const put = fetchMock.mock.calls.find(([url, init]) => url === "/api/preferences" && init?.method === "PUT")!;
-  expect(JSON.parse(put[1]!.body as string)).toEqual({ ...PREFS, professional_years: 8 });
+  await waitFor(() => expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, professional_years: 8 }));
 });
 
 function chatLines() {
@@ -312,7 +308,7 @@ test("the model note shows the saved model and is not sent to the AI", async () 
   ]);
 });
 
-test("after saving a different model the next generate names it", async () => {
+test("after choosing a different model the next generate names it", async () => {
   mockChat({ body: RESUME_RESULT });
   const fetchMock = vi.mocked(fetch);
   const base = fetchMock.getMockImplementation()!;
@@ -323,8 +319,24 @@ test("after saving a different model the next generate names it", async () => {
   );
   await ready();
   await userEvent.selectOptions(screen.getByLabelText("AI model"), "openai/gpt-5.4-nano");
-  await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
-  await screen.findByText("Saved");
   await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
   expect(await screen.findByText("Model: openai/gpt-5.4-nano")).toBeInTheDocument();
+});
+
+test("generate waits for a pending preference save", async () => {
+  const fetchMock = mockChat({ body: RESUME_RESULT });
+  const base = fetchMock.getMockImplementation()!;
+  let finishSave!: () => void;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
+    url === "/api/preferences" && init?.method === "PUT"
+      ? new Promise<Response>((resolve) => (finishSave = () => resolve(Response.json(PREFS))))
+      : base(url, init),
+  );
+  await ready();
+  await userEvent.click(screen.getByRole("checkbox", { name: "Include phone number in generated resume" }));
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  expect(generateBodies(fetchMock)).toHaveLength(0);
+  finishSave();
+  expect(await screen.findByText("Here is your resume.")).toBeInTheDocument();
+  expect(generateBodies(fetchMock)).toHaveLength(1);
 });

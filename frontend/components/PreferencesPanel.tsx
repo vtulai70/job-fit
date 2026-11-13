@@ -4,31 +4,25 @@ import { useState } from "react";
 
 import { MODELS, type Model, type Preferences, type Style } from "@/lib/api";
 
-type Props = { initial: Preferences; onSave: (prefs: Preferences) => Promise<void> };
+type Props = { initial: Preferences; onChange: (prefs: Preferences) => void };
 
 const STYLES: Style[] = ["professional", "modern", "classic"];
 
-/** Form for resume preferences used by the AI and the PDF style. */
-export default function PreferencesPanel({ initial, onSave }: Props) {
+/** Resume preferences used by the AI and the PDF style; every change is reported to be saved. */
+export default function PreferencesPanel({ initial, onChange }: Props) {
   const [prefs, setPrefs] = useState(initial);
-  const [saved, setSaved] = useState(false);
 
   function update(change: Partial<Preferences>) {
-    setPrefs({ ...prefs, ...change });
-    setSaved(false);
-  }
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    await onSave(prefs);
-    setSaved(true);
+    const next = { ...prefs, ...change };
+    setPrefs(next);
+    onChange(next);
   }
 
   const inputClass =
     "w-full rounded border border-line bg-canvas p-2 text-sm focus:border-primary focus:outline-none";
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+    <section className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
       <h2 className="font-semibold">Preferences</h2>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <label>
@@ -126,12 +120,6 @@ export default function PreferencesPanel({ initial, onSave }: Props) {
         />
         Include phone number in generated resume
       </label>
-      <div className="flex items-center gap-3">
-        <button type="submit" className="rounded bg-primary px-3 py-1 text-sm font-semibold text-canvas">
-          Save preferences
-        </button>
-        {saved && <span className="text-sm text-ink/70">Saved</span>}
-      </div>
-    </form>
+    </section>
   );
 }
