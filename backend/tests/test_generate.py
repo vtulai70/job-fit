@@ -203,7 +203,8 @@ def test_generate_uses_stored_baseline_preferences_and_history(signed_in, use_ai
     assert response.status_code == 200
     assert response.json() == {
         "reply": "Done", "company": "Initech", "experience_plan": [], "resume_md": "# Tailored",
-        "model": "openai/gpt-oss-120b", "optimization": "smart",
+        "model": "openai/gpt-oss-120b", "optimization": "smart", "professional_years": 15, "earlier_years": 10,
+        "max_pages": 2, "tone": "warm", "notes": "Mention mentoring",
     }
     messages = sent_messages(client)
     system = messages[0]["content"]
@@ -244,6 +245,18 @@ def test_generate_sends_and_names_the_stored_optimization_level(signed_in, use_a
     response = signed_in.post("/api/generate", json={"job_description": "x", "message": "go"})
     assert response.json()["optimization"] == level
     assert f"Optimization level: {OPTIMIZATION[level]}" in sent_messages(client)[0]["content"]
+
+
+def test_generate_returns_every_stored_generation_setting(signed_in, use_ai):
+    stored = {
+        "model": "openai/gpt-6-sol", "optimization": "light", "professional_years": 9, "earlier_years": 0,
+        "max_pages": 1, "tone": "bold", "notes": "Lead with AI",
+    }
+    signed_in.put("/api/preferences", json={**stored, "style": "classic", "include_phone": False})
+    use_ai(RESUME_RESULT)
+    body = signed_in.post("/api/generate", json={"job_description": "x", "message": "go"}).json()
+    assert {k: body[k] for k in stored} == stored
+    assert "style" not in body and "include_phone" not in body
 
 
 def test_generate_sends_experience_windows_for_this_year(signed_in, use_ai):

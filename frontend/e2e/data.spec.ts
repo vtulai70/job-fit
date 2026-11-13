@@ -6,6 +6,8 @@ import { expect, test } from "@playwright/test";
 import { showBaseline, signIn, signOut } from "./helpers";
 
 const RESUME = path.join(__dirname, "..", "..", "resume.md");
+/** Generation settings a history entry posted directly needs besides model and optimization. */
+const SETTINGS = { professional_years: 15, earlier_years: 10, max_pages: 2, tone: "", notes: "" };
 
 test("uploaded baseline survives logout and login", async ({ page }) => {
   await signIn(page);
@@ -104,6 +106,11 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
       style: "modern",
       model: "openai/gpt-6-sol",
       optimization: "light",
+      professional_years: 20,
+      earlier_years: 5,
+      max_pages: 3,
+      tone: "",
+      notes: "",
     },
   });
   expect(response.status()).toBe(201);
@@ -114,6 +121,10 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
   const globex = history.getByRole("listitem").filter({ hasText: "Globex Corporation" });
   await expect(globex).toContainText("openai/gpt-6-sol");
   await expect(globex).toContainText("Light polish");
+  for (const detail of ["Professional: 20 yrs", "Earlier: 5 yrs", "Max pages: 3", "Tone: no preference"]) {
+    await expect(globex).toContainText(detail);
+  }
+  await expect(globex).not.toContainText("Notes:");
 
   const downloadPromise = page.waitForEvent("download");
   await history.getByRole("link", { name: "Download Globex Corporation resume" }).click();
@@ -125,7 +136,7 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
 
 test("clear history asks first, then deletes every entry", async ({ page }) => {
   await signIn(page);
-  const entry = { job_description: "j", content_md: "# Me", style: "modern", model: "openai/gpt-oss-120b", optimization: "smart" };
+  const entry = { job_description: "j", content_md: "# Me", style: "modern", model: "openai/gpt-oss-120b", optimization: "smart", ...SETTINGS };
   for (const company of ["Clear Co One", "Clear Co Two"]) {
     expect((await page.request.post("/api/history", { data: { ...entry, company } })).status()).toBe(201);
   }
@@ -149,7 +160,7 @@ test("clear history asks first, then deletes every entry", async ({ page }) => {
 test("history shows at most 10 entries and scrolls for more", async ({ page }) => {
   await signIn(page);
   expect((await page.request.delete("/api/history")).status()).toBe(204);
-  const entry = { job_description: "j", content_md: "# Me", style: "modern", model: "openai/gpt-oss-120b", optimization: "smart" };
+  const entry = { job_description: "j", content_md: "# Me", style: "modern", model: "openai/gpt-oss-120b", optimization: "smart", ...SETTINGS };
   const add = async (n: number) =>
     expect((await page.request.post("/api/history", { data: { ...entry, company: `Scroll Co ${n}` } })).status()).toBe(201);
   for (let n = 1; n <= 10; n++) await add(n);

@@ -6,7 +6,7 @@ The full schema is in `docs/schema.json`. This document explains the approach.
 
 - SQLite file at `data/jobfit.db`. In Docker, `data/` is the host-mounted volume, so data survives container restarts.
 - Access through Python's stdlib `sqlite3`. No ORM: four small tables and simple queries do not need one.
-- On startup the backend creates the `data/` directory and the tables if missing (`CREATE TABLE IF NOT EXISTS`). A user row is created on each Clerk user's first request. No migration tool for the MVP; columns added later (`custom_resumes.model`, `custom_resumes.optimization`) are added by `init_db` with `ALTER TABLE` when missing.
+- On startup the backend creates the `data/` directory and the tables if missing (`CREATE TABLE IF NOT EXISTS`). A user row is created on each Clerk user's first request. No migration tool for the MVP; columns added later (the `custom_resumes` generation settings: `model`, `optimization`, `professional_years`, `earlier_years`, `max_pages`, `tone`, `notes`) are added by `init_db` with `ALTER TABLE` when missing.
 - One connection per request (FastAPI dependency), with `PRAGMA foreign_keys = ON` and `row_factory = sqlite3.Row`.
 - Timestamps are ISO-8601 UTC text.
 - Every query is filtered by the current user's `id`, so the schema is multi-user ready from day one.
@@ -17,7 +17,7 @@ The full schema is in `docs/schema.json`. This document explains the approach.
 |---|---|---|
 | `users` | Accounts; `username` holds the Clerk user id (e.g. `user_2abc...`) | 1 |
 | `baseline_resumes` | Current baseline resume as markdown; upload replaces it | 0..1 |
-| `custom_resumes` | Download history: company, job description, generated markdown, PDF style, timestamp, generating model and optimization level | 0..n |
+| `custom_resumes` | Download history: company, job description, generated markdown, PDF style, timestamp, and the generation settings (model, optimization level, experience years, max pages, tone, notes) | 0..n |
 | `preferences` | JSON object of preferences; no row means defaults | 0..1 |
 
 ## SQL
@@ -43,8 +43,14 @@ CREATE TABLE IF NOT EXISTS custom_resumes (
     content_md      TEXT NOT NULL,
     style           TEXT NOT NULL,
     downloaded_at   TEXT NOT NULL,
-    model           TEXT,           -- model that generated the resume; NULL for rows saved before it was recorded
-    optimization    TEXT            -- optimization level (light/smart/full) used; NULL for rows saved before it was recorded
+    -- Generation settings the resume was made with; NULL for rows saved before each was recorded.
+    model              TEXT,
+    optimization       TEXT,        -- light, smart or full
+    professional_years INTEGER,
+    earlier_years      INTEGER,
+    max_pages          INTEGER,
+    tone               TEXT,
+    notes              TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_custom_resumes_user_downloaded
     ON custom_resumes (user_id, downloaded_at);

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-import type { Model, Optimization, Style } from "@/lib/api";
+import type { GenerationSettings, Style } from "@/lib/api";
 
-/** `model` and `optimization` are the settings that generated the resume. */
-export type CustomResumeData = { company: string; content_md: string; model: Model; optimization: Optimization };
+/** `settings` are the preferences that generated the resume (saved with its download). */
+export type CustomResumeData = { company: string; content_md: string; settings: GenerationSettings };
 
 type Mode = "markdown" | "preview";
 

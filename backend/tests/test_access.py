@@ -5,11 +5,16 @@ import pytest
 from app import auth
 from app.main import app
 
+SETTINGS = {
+    "model": "openai/gpt-oss-120b", "optimization": "smart", "professional_years": 15, "earlier_years": 10,
+    "max_pages": 2, "tone": "", "notes": "",
+}
+
 PROTECTED = [
     ("GET", "/api/resume/baseline", None),
     ("PUT", "/api/resume/baseline", {"content_md": "x"}),
     ("GET", "/api/history", None),
-    ("POST", "/api/history", {"company": "A", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b", "optimization": "smart"}),
+    ("POST", "/api/history", {"company": "A", "job_description": "j", "content_md": "c", "style": "modern", **SETTINGS}),
     ("GET", "/api/history/1/pdf", None),
     ("DELETE", "/api/history", None),
     ("GET", "/api/preferences", None),
@@ -36,7 +41,7 @@ def two_users(client):
     client.put("/api/preferences", json={"style": "classic"})
     entry_id = client.post(
         "/api/history",
-        json={"company": "Acme", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b", "optimization": "smart"},
+        json={"company": "Acme", "job_description": "j", "content_md": "c", "style": "modern", **SETTINGS},
     ).json()["id"]
     act_as("user_bob")
     yield client, entry_id
@@ -70,7 +75,7 @@ def test_clearing_history_leaves_other_users_entries(two_users):
     client, entry_id = two_users
     client.post(
         "/api/history",
-        json={"company": "Bob Co", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b", "optimization": "smart"},
+        json={"company": "Bob Co", "job_description": "j", "content_md": "c", "style": "modern", **SETTINGS},
     )
     assert client.delete("/api/history").status_code == 204
     assert client.get("/api/history").json() == []

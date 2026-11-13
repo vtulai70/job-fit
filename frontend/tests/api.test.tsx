@@ -11,6 +11,11 @@ const ENTRY = {
   style: "modern" as const,
   model: "openai/gpt-6-sol" as const,
   optimization: "light" as const,
+  professional_years: 12,
+  earlier_years: 6,
+  max_pages: 3,
+  tone: "warm",
+  notes: "",
 };
 
 test("getBaseline returns the saved baseline", async () => {
@@ -73,4 +78,23 @@ test("optimizationLabel names each level", () => {
   expect(api.optimizationLabel("light")).toBe("Light polish");
   expect(api.optimizationLabel("smart")).toBe("Smart integration");
   expect(api.optimizationLabel("full")).toBe("Full tailoring");
+});
+
+test("generationSettings keeps just the generation settings", () => {
+  const result = { reply: "r", resume_md: "# R", ...ENTRY };
+  expect(Object.keys(api.generationSettings(result))).toEqual([...api.GENERATION_KEYS]);
+  expect(api.generationSettings(result)).toEqual({
+    model: "openai/gpt-6-sol",
+    optimization: "light",
+    professional_years: 12,
+    earlier_years: 6,
+    max_pages: 3,
+    tone: "warm",
+    notes: "",
+  });
+});
+
+test("toneLabel shows no preference for an empty tone", () => {
+  expect(api.toneLabel("  ")).toBe("no preference");
+  expect(api.toneLabel(" warm ")).toBe("warm");
 });

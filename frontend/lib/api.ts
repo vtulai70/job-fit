@@ -55,23 +55,41 @@ export type Preferences = {
 export type Baseline = { content_md: string | null; updated_at: string | null };
 
 /** `model` and `optimization` are null for downloads saved before they were recorded. */
+/** The preferences that shape a generated resume; /api/generate returns them and each download saves them.
+ * Keep in sync with `GenerationSettings` in `backend/app/routes/preferences.py`. */
+export const GENERATION_KEYS = [
+  "model",
+  "optimization",
+  "professional_years",
+  "earlier_years",
+  "max_pages",
+  "tone",
+  "notes",
+] as const;
+
+export type GenerationSettings = Pick<Preferences, (typeof GENERATION_KEYS)[number]>;
+
+/** Just the generation settings of a larger object, e.g. a generate result. */
+export const generationSettings = (source: GenerationSettings) =>
+  Object.fromEntries(GENERATION_KEYS.map((key) => [key, source[key]])) as GenerationSettings;
+
+/** Tone as shown to the user: "no preference" when empty. */
+export const toneLabel = (tone: string) => tone.trim() || "no preference";
+
+/** A download; the generation settings are null for downloads saved before they were recorded. */
 export type HistoryEntry = {
   id: number;
   company: string;
   style: Style;
   downloaded_at: string;
-  model: Model | null;
-  optimization: Optimization | null;
-};
+} & { [K in keyof GenerationSettings]: GenerationSettings[K] | null };
 
 export type NewHistoryEntry = {
   company: string;
   job_description: string;
   content_md: string;
   style: Style;
-  model: Model;
-  optimization: Optimization;
-};
+} & GenerationSettings;
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(path, {
@@ -129,13 +147,11 @@ export type ChatEntry = ChatMessage | { role: "info"; content: string };
 
 export type GenerateRequest = { job_description: string; message: string; history: ChatMessage[] };
 
-/** `model` and `optimization` are the saved settings the backend generated with. */
+/** The AI result plus the saved settings the backend generated with. */
 export type GenerateResult = {
   reply: string;
   company: string | null;
   resume_md: string | null;
-  model: Model;
-  optimization: Optimization;
-};
+} & GenerationSettings;
 
 export const generate = (req: GenerateRequest) => request<GenerateResult>("POST", "/api/generate", req);

@@ -46,7 +46,7 @@ test("two Clerk users do not see each other's data", async ({ page }) => {
   await showBaseline(page);
   await expect(page.getByLabel("Baseline resume content")).toContainText("Professional Summary");
   const created = await page.request.post("/api/history", {
-    data: { company: "Alice Only Inc", job_description: "j", content_md: await readFile(RESUME, "utf-8"), style: "modern", model: "openai/gpt-oss-120b", optimization: "smart" },
+    data: { company: "Alice Only Inc", job_description: "j", content_md: await readFile(RESUME, "utf-8"), style: "modern", model: "openai/gpt-oss-120b", optimization: "smart", professional_years: 15, earlier_years: 10, max_pages: 2, tone: "", notes: "" },
   });
   expect(created.status()).toBe(201);
   await signOut(page);

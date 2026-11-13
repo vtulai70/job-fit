@@ -19,7 +19,7 @@ export function settingsNote(prefs: api.Preferences): string {
   const lines = [
     `Model: ${prefs.model}`,
     `Optimization level: ${api.optimizationLabel(prefs.optimization)}`,
-    `Tone: ${prefs.tone.trim() || "no preference"}`,
+    `Tone: ${api.toneLabel(prefs.tone)}`,
   ];
   if (prefs.notes.trim()) lines.push(`Notes: ${prefs.notes.trim()}`);
   return lines.join("\n");
@@ -81,8 +81,7 @@ export default function Workspace() {
         setCustomResume({
           company: result.company ?? "Unknown company",
           content_md: result.resume_md,
-          model: result.model,
-          optimization: result.optimization,
+          settings: api.generationSettings(result),
         });
       }
     } catch {
@@ -102,8 +101,7 @@ export default function Workspace() {
       job_description: jobDescription,
       content_md: customResume!.content_md,
       style: prefs!.style,
-      model: customResume!.model,
-      optimization: customResume!.optimization,
+      ...customResume!.settings,
     });
     setHistory([entry, ...history]);
   }

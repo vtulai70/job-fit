@@ -30,8 +30,13 @@ CREATE TABLE IF NOT EXISTS custom_resumes (
     content_md      TEXT NOT NULL,
     style           TEXT NOT NULL,
     downloaded_at   TEXT NOT NULL,
-    model           TEXT,
-    optimization    TEXT
+    model              TEXT,
+    optimization       TEXT,
+    professional_years INTEGER,
+    earlier_years      INTEGER,
+    max_pages          INTEGER,
+    tone               TEXT,
+    notes              TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_custom_resumes_user_downloaded
     ON custom_resumes (user_id, downloaded_at);
@@ -44,7 +49,15 @@ CREATE TABLE IF NOT EXISTS preferences (
 
 
 # custom_resumes columns added after the first release; init_db adds them to older files.
-ADDED_HISTORY_COLUMNS = ("model", "optimization")
+ADDED_HISTORY_COLUMNS = {
+    "model": "TEXT",
+    "optimization": "TEXT",
+    "professional_years": "INTEGER",
+    "earlier_years": "INTEGER",
+    "max_pages": "INTEGER",
+    "tone": "TEXT",
+    "notes": "TEXT",
+}
 
 
 def now() -> str:
@@ -73,9 +86,9 @@ def init_db() -> None:
     conn = connect()
     conn.executescript(SCHEMA)
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(custom_resumes)")}
-    for column in ADDED_HISTORY_COLUMNS:
+    for column, sql_type in ADDED_HISTORY_COLUMNS.items():
         if column not in columns:
-            conn.execute(f"ALTER TABLE custom_resumes ADD COLUMN {column} TEXT")
+            conn.execute(f"ALTER TABLE custom_resumes ADD COLUMN {column} {sql_type}")
     conn.close()
 
 

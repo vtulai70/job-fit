@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
-import HistoryPanel, { CLEAR_CONFIRM } from "@/components/HistoryPanel";
+import HistoryPanel, { CLEAR_CONFIRM, historyDetails } from "@/components/HistoryPanel";
 import PreferencesPanel from "@/components/PreferencesPanel";
 import type { Preferences } from "@/lib/api";
 
@@ -25,7 +25,7 @@ test("history shows empty state", () => {
   expect(screen.queryByRole("button", { name: "Clear history" })).not.toBeInTheDocument();
 });
 
-const ENTRY = { id: 1, company: "Acme", style: "modern" as const, downloaded_at: "2026-11-10T10:00:00Z", model: null, optimization: null };
+const ENTRY = { id: 1, company: "Acme", style: "modern" as const, downloaded_at: "2026-11-10T10:00:00Z", model: null, optimization: null, professional_years: null, earlier_years: null, max_pages: null, tone: null, notes: null };
 
 test("clear history asks for confirmation, then calls onClear", async () => {
   const confirm = vi.fn().mockReturnValue(true);
@@ -50,8 +50,8 @@ test("history lists entries with re-download links", () => {
     <HistoryPanel
       onClear={vi.fn()}
       entries={[
-        { id: 2, company: "Beta", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-6-sol", optimization: "full" },
-        { id: 1, company: "Acme", style: "classic", downloaded_at: "2026-11-10T10:00:00Z", model: null, optimization: null },
+        { id: 2, company: "Beta", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-6-sol", optimization: "full", professional_years: 12, earlier_years: 0, max_pages: 3, tone: "", notes: "Lead with AI" },
+        { id: 1, company: "Acme", style: "classic", downloaded_at: "2026-11-10T10:00:00Z", model: null, optimization: null, professional_years: null, earlier_years: null, max_pages: null, tone: null, notes: null },
       ]}
     />,
   );
@@ -61,8 +61,12 @@ test("history lists entries with re-download links", () => {
   expect(within(items[0]).getByText(new Date("2026-11-11T10:00:00Z").toLocaleString())).toBeInTheDocument();
   expect(within(items[0]).getByText("openai/gpt-6-sol")).toBeInTheDocument();
   expect(within(items[0]).getByText("Full tailoring")).toBeInTheDocument();
+  for (const detail of ["Professional: 12 yrs", "Earlier: 0 yrs", "Max pages: 3", "Tone: no preference", "Notes: Lead with AI"]) {
+    expect(within(items[0]).getByText(detail)).toBeInTheDocument();
+  }
   expect(items[1]).not.toHaveTextContent(/openai|anthropic|google/);
   expect(items[1]).not.toHaveTextContent(/polish|integration|tailoring/);
+  expect(items[1]).not.toHaveTextContent(/Professional|Earlier|Max pages|Tone|Notes/);
   expect(screen.getByRole("link", { name: "Download Beta resume" })).toHaveAttribute("href", "/api/history/2/pdf");
   expect(screen.getByRole("link", { name: "Download Acme resume" })).toHaveAttribute("href", "/api/history/1/pdf");
 });
@@ -286,4 +290,34 @@ test("choosing an optimization level saves it and updates the description", asyn
   expect(select).toHaveAccessibleDescription(
     "Adds the skills and requirements to the resume and keeps the original context intact.",
   );
+});
+
+const RECORDED = {
+  ...ENTRY,
+  model: "openai/gpt-oss-120b" as const,
+  optimization: "smart" as const,
+  professional_years: 15,
+  earlier_years: 10,
+  max_pages: 2,
+  tone: "concise",
+  notes: "",
+};
+
+test("history details list every recorded setting in order, notes only when set", () => {
+  expect(historyDetails(RECORDED)).toEqual([
+    "openai/gpt-oss-120b",
+    "Smart integration",
+    "Professional: 15 yrs",
+    "Earlier: 10 yrs",
+    "Max pages: 2",
+    "Tone: concise",
+  ]);
+  expect(historyDetails({ ...RECORDED, tone: " ", notes: " Stress mentoring " }).slice(-2)).toEqual([
+    "Tone: no preference",
+    "Notes: Stress mentoring",
+  ]);
+});
+
+test("history details are empty for downloads saved before settings were recorded", () => {
+  expect(historyDetails(ENTRY)).toEqual([]);
 });

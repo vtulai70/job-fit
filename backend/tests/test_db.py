@@ -29,7 +29,10 @@ def test_init_adds_newer_columns_to_an_older_history_table(tmp_path, monkeypatch
     db.init_db()
     db.init_db()
     conn = sqlite3.connect(db.DB_PATH)
-    assert conn.execute("SELECT company, model, optimization FROM custom_resumes").fetchall() == [("Acme", None, None)]
+    added = list(db.ADDED_HISTORY_COLUMNS)
+    assert conn.execute(f"SELECT company, {', '.join(added)} FROM custom_resumes").fetchall() == [("Acme",) + (None,) * len(added)]
+    types = {row[1]: row[2] for row in conn.execute("PRAGMA table_info(custom_resumes)")}
+    assert {c: types[c] for c in added} == db.ADDED_HISTORY_COLUMNS
     conn.close()
 
 

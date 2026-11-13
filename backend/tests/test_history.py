@@ -1,4 +1,7 @@
+import pytest
+
 from app import db
+from app.routes.preferences import GENERATION_FIELDS
 
 ENTRY = {
     "company": "Acme Corp",
@@ -7,6 +10,11 @@ ENTRY = {
     "style": "professional",
     "model": "anthropic/claude-sonnet-5.5",
     "optimization": "full",
+    "professional_years": 12,
+    "earlier_years": 6,
+    "max_pages": 3,
+    "tone": "warm",
+    "notes": "Stress mentoring",
 }
 
 
@@ -24,6 +32,31 @@ def test_add_entry(signed_in):
     assert body["model"] == "anthropic/claude-sonnet-5.5"
     assert body["optimization"] == "full"
     assert isinstance(body["id"], int)
+
+
+def test_history_saves_and_lists_every_generation_setting(signed_in):
+    signed_in.post("/api/history", json=ENTRY)
+    entry = signed_in.get("/api/history").json()[0]
+    assert {field: entry[field] for field in GENERATION_FIELDS} == {field: ENTRY[field] for field in GENERATION_FIELDS}
+    assert (entry["professional_years"], entry["earlier_years"], entry["max_pages"]) == (12, 6, 3)
+    assert (entry["tone"], entry["notes"]) == ("warm", "Stress mentoring")
+
+
+@pytest.mark.parametrize("field", GENERATION_FIELDS)
+def test_history_requires_every_generation_setting(signed_in, field):
+    without = {k: v for k, v in ENTRY.items() if k != field}
+    assert signed_in.post("/api/history", json=without).status_code == 422
+
+
+@pytest.mark.parametrize("change", [{"professional_years": 0}, {"professional_years": 51}, {"earlier_years": -1}])
+def test_history_rejects_out_of_range_experience_years(signed_in, change):
+    assert signed_in.post("/api/history", json={**ENTRY, **change}).status_code == 422
+
+
+def test_history_keeps_empty_tone_and_notes(signed_in):
+    signed_in.post("/api/history", json={**ENTRY, "tone": "", "notes": ""})
+    entry = signed_in.get("/api/history").json()[0]
+    assert (entry["tone"], entry["notes"]) == ("", "")
 
 
 def test_history_lists_the_model(signed_in):
@@ -55,10 +88,10 @@ def test_entries_saved_before_the_newer_columns_list_without_them(signed_in):
     signed_in.post("/api/history", json=ENTRY)
     conn = db.connect()
     with conn:
-        conn.execute("UPDATE custom_resumes SET model = NULL, optimization = NULL")
+        conn.execute(f"UPDATE custom_resumes SET {', '.join(f'{f} = NULL' for f in GENERATION_FIELDS)}")
     conn.close()
     entry = signed_in.get("/api/history").json()[0]
-    assert (entry["model"], entry["optimization"]) == (None, None)
+    assert [entry[field] for field in GENERATION_FIELDS] == [None] * len(GENERATION_FIELDS)
 
 
 def test_list_newest_first(signed_in):

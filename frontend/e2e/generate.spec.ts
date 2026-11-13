@@ -9,16 +9,33 @@ import { showBaseline, signIn } from "./helpers";
 const RESUME = path.join(__dirname, "..", "..", "resume.md");
 const TAILORED = "# Voicu Tulai\n\n## Professional Summary\n\nEngineering leader for Umbrella Corp.";
 
-/** The model and level the mocked /api/generate says it used (the real route returns the saved ones). */
+/** The settings the mocked /api/generate says it used (the real route returns the saved ones). */
 const GENERATED_BY = "anthropic/claude-haiku-5.5";
-const GENERATED_WITH = "full";
+const GENERATED_WITH = {
+  model: GENERATED_BY,
+  optimization: "full",
+  professional_years: 7,
+  earlier_years: 2,
+  max_pages: 1,
+  tone: "crisp",
+  notes: "Mention Kubernetes",
+};
+const GENERATED_DETAILS = [
+  GENERATED_BY,
+  "Full tailoring",
+  "Professional: 7 yrs",
+  "Earlier: 2 yrs",
+  "Max pages: 1",
+  "Tone: crisp",
+  "Notes: Mention Kubernetes",
+];
 
 /** Answer /api/generate with the given replies in order, recording request bodies. */
 async function mockGenerate(page: Page, replies: object[]) {
   const bodies: Record<string, unknown>[] = [];
   await page.route("**/api/generate", async (route) => {
     bodies.push(route.request().postDataJSON());
-    await route.fulfill({ json: { model: GENERATED_BY, optimization: GENERATED_WITH, ...replies.shift() } });
+    await route.fulfill({ json: { ...GENERATED_WITH, ...replies.shift() } });
   });
   return bodies;
 }
@@ -54,13 +71,12 @@ test("generate, download PDF, and see it in history", async ({ page }) => {
   expect((await readFile(await download.path())).subarray(0, 4).toString()).toBe("%PDF");
 
   const history = page.getByRole("region", { name: "Download history" });
-  await expect(history.getByText("Umbrella Corp")).toBeVisible();
-  await expect(history.getByText(GENERATED_BY)).toBeVisible();
-  await expect(history.getByText("Full tailoring")).toBeVisible();
+  const newest = history.getByRole("listitem").first();
+  await expect(newest).toContainText("Umbrella Corp");
+  for (const detail of GENERATED_DETAILS) await expect(newest.getByText(detail, { exact: true })).toBeVisible();
   await page.reload();
-  await expect(history.getByText("Umbrella Corp")).toBeVisible();
-  await expect(history.getByText(GENERATED_BY)).toBeVisible();
-  await expect(history.getByText("Full tailoring")).toBeVisible();
+  await expect(newest).toContainText("Umbrella Corp");
+  for (const detail of GENERATED_DETAILS) await expect(newest.getByText(detail, { exact: true })).toBeVisible();
 });
 
 test("clarifying question is answered in chat before the resume", async ({ page }) => {

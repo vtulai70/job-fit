@@ -36,7 +36,12 @@
         { "name": "style", "type": "TEXT", "constraints": ["NOT NULL"], "description": "PDF style used at download time" },
         { "name": "downloaded_at", "type": "TEXT", "constraints": ["NOT NULL"] },
         { "name": "model", "type": "TEXT", "constraints": [], "description": "OpenRouter model that generated the resume; NULL for rows saved before it was recorded" },
-        { "name": "optimization", "type": "TEXT", "constraints": [], "description": "Optimization level (light, smart, full) that generated the resume; NULL for rows saved before it was recorded" }
+        { "name": "optimization", "type": "TEXT", "constraints": [], "description": "Optimization level (light, smart, full) that generated the resume; NULL for rows saved before it was recorded" },
+        { "name": "professional_years", "type": "INTEGER", "constraints": [], "description": "Professional Experience years the resume was generated with; NULL for older rows" },
+        { "name": "earlier_years", "type": "INTEGER", "constraints": [], "description": "Earlier Experience years the resume was generated with; NULL for older rows" },
+        { "name": "max_pages", "type": "INTEGER", "constraints": [], "description": "Max pages the resume was generated with; NULL for older rows" },
+        { "name": "tone", "type": "TEXT", "constraints": [], "description": "Tone the resume was generated with (may be empty); NULL for older rows" },
+        { "name": "notes", "type": "TEXT", "constraints": [], "description": "Notes for the AI the resume was generated with (may be empty); NULL for older rows" }
       ],
       "indexes": [
         { "name": "idx_custom_resumes_user_downloaded", "columns": ["user_id", "downloaded_at"] }

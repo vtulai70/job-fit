@@ -20,7 +20,7 @@ const PREFS: Preferences = {
   optimization: "smart",
 };
 const HISTORY = [
-  { id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-oss-120b", optimization: "full" },
+  { id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-oss-120b", optimization: "full", professional_years: 15, earlier_years: 10, max_pages: 2, tone: "concise", notes: "" },
 ];
 
 function mockData(baseline: string | null = "# Saved resume") {
@@ -90,6 +90,11 @@ const RESUME_RESULT = {
   resume_md: "# Tailored for Initech",
   model: "openai/gpt-oss-120b",
   optimization: "smart",
+  professional_years: 15,
+  earlier_years: 10,
+  max_pages: 2,
+  tone: "concise",
+  notes: "",
 };
 const QUESTION_RESULT = {
   reply: "Which team size should I emphasize?",
@@ -97,6 +102,11 @@ const QUESTION_RESULT = {
   resume_md: null,
   model: "openai/gpt-oss-120b",
   optimization: "smart",
+  professional_years: 15,
+  earlier_years: 10,
+  max_pages: 2,
+  tone: "concise",
+  notes: "",
 };
 
 function mockChat(...results: { status?: number; body?: unknown }[]) {
@@ -182,7 +192,7 @@ test("a failed generate shows an error message in the chat", async () => {
   expect(screen.getByRole("button", { name: "Generate custom resume" })).toBeEnabled();
 });
 
-test("downloading the generated resume records history with company, job, style, model and optimization", async () => {
+test("downloading the generated resume records history with company, job, style and generation settings", async () => {
   const fetchMock = mockChat({ body: RESUME_RESULT });
   const base = fetchMock.getMockImplementation()!;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
@@ -192,7 +202,7 @@ test("downloading the generated resume records history with company, job, style,
           company: "Initech",
           style: "modern",
           downloaded_at: "2026-11-11T12:00:00Z",
-          model: "openai/gpt-oss-120b", optimization: "full",
+          model: "openai/gpt-oss-120b", optimization: "full", professional_years: 15, earlier_years: 10, max_pages: 2, tone: "concise", notes: "",
         })
       : base(url, init),
   );
@@ -211,6 +221,11 @@ test("downloading the generated resume records history with company, job, style,
     style: "modern",
     model: "openai/gpt-oss-120b",
     optimization: "smart",
+    professional_years: 15,
+    earlier_years: 10,
+    max_pages: 2,
+    tone: "concise",
+    notes: "",
   });
   expect(screen.getByRole("link", { name: "Download Initech resume" })).toBeInTheDocument();
 });
@@ -231,6 +246,33 @@ test("changing the optimization level saves it", async () => {
   render(<Workspace />);
   await userEvent.selectOptions(await screen.findByLabelText("Optimization level"), "full");
   await waitFor(() => expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, optimization: "full" }));
+});
+
+test("download records every generation setting the resume was made with, not ones chosen afterwards", async () => {
+  const generatedWith = {
+    model: "openai/gpt-6-sol",
+    optimization: "light",
+    professional_years: 9,
+    earlier_years: 0,
+    max_pages: 1,
+    tone: "bold",
+    notes: "Lead with AI",
+  } as const;
+  const fetchMock = mockChat({ body: { ...RESUME_RESULT, ...generatedWith } });
+  mockHistoryPost(fetchMock);
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await screen.findByLabelText("Custom resume content");
+  await userEvent.clear(screen.getByLabelText("Tone"));
+  await userEvent.type(screen.getByLabelText("Tone"), "calm");
+  await userEvent.type(screen.getByLabelText("Notes for the AI"), "changed");
+  await userEvent.clear(screen.getByLabelText("Max pages"));
+  await userEvent.type(screen.getByLabelText("Max pages"), "4");
+  await userEvent.click(screen.getByRole("button", { name: "Download PDF" }));
+  await vi.waitFor(() => expect(postedHistory(fetchMock)).toMatchObject(generatedWith));
+  expect(Object.keys(postedHistory(fetchMock)).sort()).toEqual(
+    ["company", "job_description", "content_md", "style", ...Object.keys(generatedWith)].sort(),
+  );
 });
 
 test("download records the model that generated the resume, not a model chosen afterwards", async () => {

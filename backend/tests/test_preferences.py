@@ -1,6 +1,7 @@
 import pytest
 
 from app import db
+from app.routes.preferences import GENERATION_FIELDS, Preferences, generation_settings
 
 DEFAULTS = {"style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": True, "include_graduation_year": False,
             "professional_years": 15, "earlier_years": 10, "model": "openai/gpt-oss-120b",
@@ -109,3 +110,14 @@ def test_optimization_level_saved(signed_in, level):
 
 def test_unknown_optimization_level_rejected(signed_in):
     assert signed_in.put("/api/preferences", json={"optimization": "extreme"}).status_code == 422
+
+
+def test_generation_settings_are_the_preferences_that_shape_a_resume():
+    assert GENERATION_FIELDS == (
+        "model", "optimization", "professional_years", "earlier_years", "max_pages", "tone", "notes",
+    )
+    prefs = Preferences(tone="warm", notes="n", max_pages=3, professional_years=9, earlier_years=0, style="classic")
+    assert generation_settings(prefs).model_dump() == {
+        "model": "openai/gpt-oss-120b", "optimization": "smart", "professional_years": 9, "earlier_years": 0,
+        "max_pages": 3, "tone": "warm", "notes": "n",
+    }
