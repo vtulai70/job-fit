@@ -45,7 +45,7 @@ test("generate, download PDF, and see it in history", async ({ page }) => {
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PDF" }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("resume-Umbrella-Corp.pdf");
+  expect(download.suggestedFilename()).toBe("Resume - Voicu Tulai - Umbrella Corp.pdf");
   expect((await readFile(await download.path())).subarray(0, 4).toString()).toBe("%PDF");
 
   const history = page.getByRole("region", { name: "Download history" });

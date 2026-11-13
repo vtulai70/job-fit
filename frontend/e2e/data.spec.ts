@@ -75,7 +75,7 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
   const downloadPromise = page.waitForEvent("download");
   await history.getByRole("link", { name: "Download Globex Corporation resume" }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("resume-Globex-Corporation.pdf");
+  expect(download.suggestedFilename()).toBe("Resume - Voicu Tulai's resume - Globex Corporation.pdf");
   const pdf = await readFile(await download.path());
   expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
 });

@@ -56,14 +56,27 @@ def test_pdf_download(signed_in):
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
     assert response.content.startswith(b"%PDF")
-    assert 'filename="resume-Acme-Corp.pdf"' in response.headers["content-disposition"]
+    assert response.headers["content-disposition"] == (
+        "attachment; filename*=UTF-8''Resume%20-%20Jane%20Doe%20-%20Acme%20Corp.pdf"
+    )
 
 
 def test_pdf_filename_safe_for_unusual_company(signed_in):
     entry_id = signed_in.post("/api/history", json={**ENTRY, "company": 'Café "Q" & Co.'}).json()["id"]
     response = signed_in.get(f"/api/history/{entry_id}/pdf")
     assert response.status_code == 200
-    assert 'filename="resume-Caf-Q-Co.pdf"' in response.headers["content-disposition"]
+    assert response.headers["content-disposition"] == (
+        "attachment; filename*=UTF-8''Resume%20-%20Jane%20Doe%20-%20Caf%C3%A9%20Q%20%26%20Co..pdf"
+    )
+
+
+def test_pdf_filename_from_top_heading():
+    from app.routes.history import pdf_filename
+
+    assert pdf_filename("# Jane Doe\n\n## Experience", "Acme") == "Resume - Jane Doe - Acme.pdf"
+    assert pdf_filename("Intro\n# Jane  Doe \n# Other", "Acme") == "Resume - Jane Doe - Acme.pdf"
+    assert pdf_filename("## Experience", "Acme") == "Resume - Acme.pdf"
+    assert pdf_filename("# A/B: Doe", "") == "Resume - A B Doe.pdf"
 
 
 def test_pdf_unknown_entry(signed_in):

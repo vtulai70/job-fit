@@ -1,4 +1,4 @@
-# Voicu Tulai's resume
+# Voicu Tulai
 
 ## Contact
 Port Moody, BC

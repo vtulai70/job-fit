@@ -1,6 +1,7 @@
 """Download history of custom resumes, and PDF re-download."""
 
 import re
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
@@ -62,10 +63,21 @@ def history_pdf(entry_id: int, user_id: UserId, db: Db) -> Response:
     ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Not found")
-    slug = re.sub(r"[^A-Za-z0-9]+", "-", row["company"]).strip("-")
-    filename = f"resume-{slug or 'custom'}.pdf"
+    filename = pdf_filename(row["content_md"], row["company"])
     return Response(
         render_pdf(row["content_md"], row["style"]),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
     )
+
+
+def clean(text: str) -> str:
+    """Drop characters not allowed in file names and collapse whitespace."""
+    return " ".join(re.sub(r'[\\/:*?"<>|\x00-\x1f]', " ", text).split())
+
+
+def pdf_filename(content_md: str, company: str) -> str:
+    """'Resume - <name> - <company>.pdf', the name taken from the resume's top '# ' heading."""
+    heading = re.search(r"^# +(.+)$", content_md, re.MULTILINE)
+    parts = ["Resume", clean(heading[1]) if heading else "", clean(company)]
+    return " - ".join(part for part in parts if part) + ".pdf"
