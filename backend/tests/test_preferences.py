@@ -2,8 +2,8 @@ import pytest
 
 from app import db
 
-DEFAULTS = {"style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": True, "professional_years": 15, "earlier_years": 10,
-            "model": "openai/gpt-oss-120b"}
+DEFAULTS = {"style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": True, "include_graduation_year": False,
+            "professional_years": 15, "earlier_years": 10, "model": "openai/gpt-oss-120b"}
 
 
 def test_defaults_when_none_saved(signed_in):
@@ -14,7 +14,7 @@ def test_defaults_when_none_saved(signed_in):
 
 def test_put_then_get(signed_in):
     prefs = {"style": "modern", "tone": "concise", "max_pages": 1, "notes": "Highlight AI work", "include_phone": False,
-             "professional_years": 12, "earlier_years": 0, "model": "anthropic/claude-sonnet-5.5"}
+             "include_graduation_year": True, "professional_years": 12, "earlier_years": 0, "model": "anthropic/claude-sonnet-5.5"}
     assert signed_in.put("/api/preferences", json=prefs).json() == prefs
     assert signed_in.get("/api/preferences").json() == prefs
 
@@ -46,6 +46,13 @@ def test_preferences_saved_before_phone_option_default_to_include(signed_in):
         )
     conn.close()
     assert signed_in.get("/api/preferences").json() == {**DEFAULTS, "style": "modern"}
+
+
+def test_graduation_year_can_be_included_and_excluded_again(signed_in):
+    signed_in.put("/api/preferences", json={"include_graduation_year": True})
+    assert signed_in.get("/api/preferences").json()["include_graduation_year"] is True
+    signed_in.put("/api/preferences", json={"include_graduation_year": False})
+    assert signed_in.get("/api/preferences").json()["include_graduation_year"] is False
 
 
 def test_include_phone_must_be_boolean(signed_in):

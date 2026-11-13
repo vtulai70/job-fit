@@ -147,3 +147,21 @@ test("clearing the resume disables download", async ({ page }) => {
   await page.getByLabel("Custom resume content").fill("");
   await expect(page.getByRole("button", { name: "Download PDF" })).toBeDisabled();
 });
+
+test("preview shows the resume as the PDF renders it and toggles back to Markdown", async ({ page }) => {
+  await mockGenerate(page, [{ reply: "Here you go.", company: "Umbrella Corp", resume_md: TAILORED }]);
+  await prepare(page);
+  await page.getByRole("button", { name: "Generate custom resume" }).click();
+  const editor = page.getByLabel("Custom resume content");
+  await expect(editor).toHaveValue(TAILORED);
+  await editor.fill(`${TAILORED}\n\n## Hand-edited section`);
+
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(editor).toHaveCount(0);
+  const preview = page.frameLocator('iframe[title="Custom resume preview"]');
+  await expect(preview.getByRole("heading", { level: 1, name: "Voicu Tulai" })).toBeVisible();
+  await expect(preview.getByRole("heading", { level: 2, name: "Hand-edited section" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Markdown" }).click();
+  await expect(editor).toHaveValue(`${TAILORED}\n\n## Hand-edited section`);
+});

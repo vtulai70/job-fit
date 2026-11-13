@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import ai
 from app.db import init_db
-from app.routes import generate, history, preferences, resume
+from app.routes import generate, history, preferences, preview, resume
 
 STATIC_DIR = Path(os.environ.get("STATIC_DIR", Path(__file__).parent.parent / "static"))
 
@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="JobFit", lifespan=lifespan)
-ROUTERS = (resume.router, history.router, preferences.router, ai.router, generate.router)
+ROUTERS = (resume.router, history.router, preferences.router, preview.router, ai.router, generate.router)
 for router in ROUTERS:
     app.include_router(router)
 

@@ -13,6 +13,7 @@ PROTECTED = [
     ("GET", "/api/history/1/pdf", None),
     ("GET", "/api/preferences", None),
     ("PUT", "/api/preferences", {"style": "modern"}),
+    ("POST", "/api/preview", {"content_md": "x", "style": "modern"}),
 ]
 
 

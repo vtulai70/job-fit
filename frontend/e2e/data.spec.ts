@@ -37,6 +37,9 @@ test("preferences persist across reload", async ({ page }) => {
   const phone = page.getByRole("checkbox", { name: "Include phone number in generated resume" });
   await expect(phone).toBeChecked();
   await phone.uncheck();
+  const graduation = page.getByRole("checkbox", { name: "Include university graduation year in generated resume" });
+  await expect(graduation).not.toBeChecked();
+  await graduation.check();
   await expect(page.getByLabel("Professional Experience (years)")).toHaveValue("15");
   await expect(page.getByLabel("Earlier Experience (years)")).toHaveValue("10");
   await page.getByLabel("Professional Experience (years)").fill("12");
@@ -53,6 +56,7 @@ test("preferences persist across reload", async ({ page }) => {
   await expect(page.getByLabel("Tone")).toHaveValue("concise, metrics-driven");
   await expect(page.getByLabel("Notes for the AI")).toHaveValue("Emphasize AI adoption");
   await expect(page.getByRole("checkbox", { name: "Include phone number in generated resume" })).not.toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Include university graduation year in generated resume" })).toBeChecked();
   await expect(page.getByLabel("Professional Experience (years)")).toHaveValue("12");
   await expect(page.getByLabel("Earlier Experience (years)")).toHaveValue("6");
   await expect(page.getByLabel("AI model")).toHaveValue("anthropic/claude-sonnet-5.5");

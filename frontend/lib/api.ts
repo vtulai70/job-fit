@@ -21,6 +21,7 @@ export type Preferences = {
   max_pages: number;
   notes: string;
   include_phone: boolean;
+  include_graduation_year: boolean;
   professional_years: number;
   earlier_years: number;
   model: Model;
@@ -63,6 +64,10 @@ export const addHistory = (entry: NewHistoryEntry) =>
   request<HistoryEntry>("POST", "/api/history", entry);
 
 export const pdfUrl = (id: number) => `/api/history/${id}/pdf`;
+
+/** The HTML the PDF would be rendered from, in the given style. */
+export const previewHtml = async (content_md: string, style: Style) =>
+  (await request<{ html: string }>("POST", "/api/preview", { content_md, style })).html;
 
 /** Trigger a browser download; the server responds with Content-Disposition: attachment. */
 export function downloadFile(url: string) {

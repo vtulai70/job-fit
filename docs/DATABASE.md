@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS preferences (
 
 ```json
 { "style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": true,
+  "include_graduation_year": false,
   "professional_years": 15, "earlier_years": 10, "model": "openai/gpt-oss-120b" }
 ```
 
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS preferences (
 - `max_pages`: target resume length
 - `notes`: anything else the AI should always consider
 - `include_phone`: whether the generated resume keeps the phone number from the baseline (rows saved before this key existed load as `true`)
+- `include_graduation_year`: whether the generated resume keeps the university graduation/completion year in Education (default `false`; older rows load as `false`)
 - `professional_years` (1-50, default 15) and `earlier_years` (0-50, default 10): experience windows, see `backend/CLAUDE.md`. Older rows load with the defaults
 - `model`: OpenRouter model id used for generation, one of the list in `backend/app/ai.py` (`Model`); default `openai/gpt-oss-120b`, older rows load with the default
 

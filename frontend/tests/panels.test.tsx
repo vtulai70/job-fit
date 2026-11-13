@@ -12,6 +12,7 @@ const PREFS: Preferences = {
   max_pages: 2,
   notes: "",
   include_phone: true,
+  include_graduation_year: false,
   professional_years: 15,
   earlier_years: 10,
   model: "openai/gpt-oss-120b",
@@ -65,6 +66,7 @@ test("every edit reports the full preferences", async () => {
     tone: "concise",
     notes: "Lead with AI",
     include_phone: true,
+    include_graduation_year: false,
     professional_years: 15,
     earlier_years: 10,
     model: "openai/gpt-oss-120b",
@@ -84,6 +86,23 @@ test("unchecking the phone option saves include_phone false", async () => {
   render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
   await userEvent.click(screen.getByRole("checkbox", { name: "Include phone number in generated resume" }));
   expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, include_phone: false });
+});
+
+const GRADUATION = "Include university graduation year in generated resume";
+
+test("graduation year checkbox is off by default and reflects the saved preference", () => {
+  const { unmount } = render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  expect(screen.getByRole("checkbox", { name: GRADUATION })).not.toBeChecked();
+  unmount();
+  render(<PreferencesPanel initial={{ ...PREFS, include_graduation_year: true }} onChange={vi.fn()} />);
+  expect(screen.getByRole("checkbox", { name: GRADUATION })).toBeChecked();
+});
+
+test("checking the graduation year option saves include_graduation_year true", async () => {
+  const onChange = vi.fn();
+  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
+  await userEvent.click(screen.getByRole("checkbox", { name: GRADUATION }));
+  expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, include_graduation_year: true });
 });
 
 test("experience year fields show the saved values", () => {
@@ -157,6 +176,7 @@ test("preferences are grouped: resume generation first, PDF last", () => {
     expect(within(generation).getByLabelText(label)).toBeInTheDocument();
   }
   expect(within(generation).getByRole("checkbox", { name: "Include phone number in generated resume" })).toBeInTheDocument();
+  expect(within(generation).getByRole("checkbox", { name: GRADUATION })).toBeInTheDocument();
   const pdf = screen.getByRole("group", { name: "PDF" });
   expect(within(pdf).getByLabelText("PDF style")).toBeInTheDocument();
   expect(within(pdf).queryByLabelText("AI model")).not.toBeInTheDocument();

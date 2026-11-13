@@ -23,7 +23,7 @@ Your task is to analyze a job description and generate a custom resume and cover
 - The custom resume in PDF
 
 ## Narrowing
-- IMPORTANT: do not include the year of the university graduation
+- IMPORTANT: do not include the year of the university graduation, unless the user preference says to include it
 - IMPORTANT: do not include technologies or programming languages not included in the original resume. For example, if the role asks for Azure, do not include it as it is missing from the original resume, and include AWS instead.
 - IMPORTANT: do not invent experience entries not included in the original resume
 - IMPORTANT: Extended experience entries should only have role, company name and years, do not include any other details

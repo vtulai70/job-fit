@@ -12,6 +12,7 @@ const PREFS = {
   max_pages: 2,
   notes: "",
   include_phone: true,
+  include_graduation_year: false,
   professional_years: 15,
   earlier_years: 10,
   model: "openai/gpt-oss-120b",

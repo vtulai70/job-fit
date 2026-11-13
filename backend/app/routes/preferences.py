@@ -20,6 +20,7 @@ class Preferences(BaseModel):
     max_pages: int = 2
     notes: str = ""
     include_phone: bool = True
+    include_graduation_year: bool = False
     professional_years: int = Field(default=15, ge=1, le=50)
     earlier_years: int = Field(default=10, ge=0, le=50)
     model: Model = MODEL

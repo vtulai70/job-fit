@@ -6,9 +6,10 @@ This project is for building a resume customizer App, which allows the user to c
 - A user can sign in (Clerk accounts; each user only sees their own data)
 - When signed in, the user can upload or update the baseline resume, paste the job description, generate the custom resume, and optionally download this as PDF
 - The generated custom resume is editable in the UI; Download PDF always uses the edited text, and that edited text is what is saved to the database
-- The baseline resume and user preferences (PDF style, AI model, tone, max pages, notes for the AI, include/exclude phone number, Professional Experience years, Earlier Experience years) are persisted
-- Preferences are shown in two groups: "Resume generation" at the top (AI model, Professional/Earlier Experience years, max pages, tone, notes for the AI, include phone number) and "PDF" at the bottom (PDF style)
-- Preferences are saved automatically on every change (there is no Save button) and sent to the AI with the baseline resume and job description on every generation; a generation waits for pending preference saves. Unchecking "Include phone number in generated resume" removes the phone number from the generated resume
+- A Markdown / Preview toggle switches the custom resume between the editable Markdown (default) and a read-only preview rendered by the backend from the same HTML and saved PDF style as the PDF; the preview follows edits and PDF style changes
+- The baseline resume and user preferences (PDF style, AI model, tone, max pages, notes for the AI, include/exclude phone number, include/exclude university graduation year, Professional Experience years, Earlier Experience years) are persisted
+- Preferences are shown in two groups: "Resume generation" at the top (AI model, Professional/Earlier Experience years, max pages, tone, notes for the AI, include phone number, include graduation year) and "PDF" at the bottom (PDF style)
+- Preferences are saved automatically on every change (there is no Save button) and sent to the AI with the baseline resume and job description on every generation; a generation waits for pending preference saves. Unchecking "Include phone number in generated resume" removes the phone number from the generated resume. "Include university graduation year in generated resume" is off by default, so Education entries have no year; checking it keeps each degree's graduation/completion year from the baseline
 - Experience windows: roles that ended within the last "Professional Experience (years)" (default 15) go in a "Professional Experience" section with full detail; roles that ended in the "Earlier Experience (years)" before that (default 10) go in an "Earlier Experience" section with one list item per role (role, company name and years only, no other details); older roles are left out. A role is placed by its end year; 0 earlier years means no Earlier Experience section
 - The custom resumes are persisted when downloaded. The company, PDF style and download timestamp are also persisted.
 - The PDF file is named `Resume - <name> - <company>.pdf` (set by the backend via `Content-Disposition`). The name is the custom resume's first `# ` heading; the company is the one the AI extracted ("Unknown company" when it returns none). Characters not allowed in file names are replaced and whitespace collapsed; an empty part is left out
@@ -20,7 +21,7 @@ This project is for building a resume customizer App, which allows the user to c
 
 - Runs locally in a Docker container.
 - The job description is pasted text only; URLs are not fetched.
-- The AI follows the resume rules (from `docs/INSTRUCTIONS.md`: no new technologies, no invented experience entries, no graduation year, experience windows, one-line Earlier Experience entries) by prompt only; there is no hard post-check. Real-model tests check these rules, and models occasionally slip (e.g. `gpt-oss-120b` dropped the Education section in about 1 of 10 runs and put the Nokia role ending 2012 in Earlier Experience in about 1 of 10). `~google/gemini-pro-latest` returns no resume (`resume_md` null while its reply says it is done) in about 1 of 4 generations; prompt wording and field order did not change that
+- The AI follows the resume rules (from `docs/INSTRUCTIONS.md`: no new technologies, no invented experience entries, graduation year only when the preference is on, experience windows, one-line Earlier Experience entries) by prompt only; there is no hard post-check. Real-model tests check these rules, and models occasionally slip (e.g. `gpt-oss-120b` dropped the Education section in about 1 of 10 runs and put the Nokia role ending 2012 in Earlier Experience in about 1 of 10). `~google/gemini-pro-latest` returns no resume (`resume_md` null while its reply says it is done) in about 1 of 4 generations; prompt wording and field order did not change that
 
 ## Technical Decisions
 
@@ -32,7 +33,7 @@ This project is for building a resume customizer App, which allows the user to c
 - Default model `openai/gpt-oss-120b`; the user can pick another from a fixed list (all support Structured Outputs on OpenRouter). Structured Outputs: `{reply, company, experience_plan, resume_md}`. The model list lives in `backend/app/ai.py` (`Model`, validated) and `frontend/lib/api.ts` (`MODELS`); keep them in sync
 - Use SQLite (stdlib `sqlite3`, no ORM) at `data/jobfit.db`, creating a new db if it doesn't exist; schema in `docs/DATABASE.md`
 - Authentication with Clerk: `@clerk/react` in the frontend, `clerk-backend-api` verifies the session cookie in the backend. `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are in .env
-- PDFs are rendered in the backend from markdown with WeasyPrint (styles: professional, modern, classic)
+- PDFs are rendered in the backend from markdown with WeasyPrint (styles: professional, modern, classic); the preview (`POST /api/preview`) returns the same HTML, shown in a sandboxed iframe
 - Start and Stop server scripts for Mac, PC, Linux in scripts/
 
 ## Project layout and commands

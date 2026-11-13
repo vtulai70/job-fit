@@ -69,6 +69,18 @@ def test_system_prompt_excludes_phone_when_requested():
     assert "Phone number: include the phone number" not in prompt
 
 
+def test_system_prompt_excludes_graduation_year_by_default():
+    prompt = build_system_prompt("# Me", "Job", Preferences(), 2026)
+    assert "Graduation year: do NOT include any year in the Education section" in prompt
+    assert "Graduation year: keep" not in prompt
+
+
+def test_system_prompt_keeps_graduation_year_when_requested():
+    prompt = build_system_prompt("# Me", "Job", Preferences(include_graduation_year=True), 2026)
+    assert "Graduation year: keep the graduation or completion year" in prompt
+    assert "do NOT include any year in the Education section" not in prompt
+
+
 def test_experience_rules_default_windows():
     rules = experience_rules(Preferences(), 2026)
     assert "Professional Experience\" section: every role that ended in 2011 or later" in rules
@@ -177,6 +189,14 @@ def test_generate_sends_stored_phone_preference(signed_in, use_ai, include_phone
     assert f"Phone number: {expected}" in system
 
 
+@pytest.mark.parametrize("include,expected", [(True, "keep the graduation"), (False, "do NOT include any year")])
+def test_generate_sends_stored_graduation_year_preference(signed_in, use_ai, include, expected):
+    signed_in.put("/api/preferences", json={"include_graduation_year": include})
+    client = use_ai(RESUME_RESULT)
+    signed_in.post("/api/generate", json={"job_description": "Director at Initech", "message": "go"})
+    assert f"Graduation year: {expected}" in sent_messages(client)[0]["content"]
+
+
 def test_generate_sends_experience_windows_for_this_year(signed_in, use_ai):
     signed_in.put("/api/preferences", json={"professional_years": 8, "earlier_years": 4})
     client = use_ai(RESUME_RESULT)
@@ -246,6 +266,15 @@ def test_real_generation_respects_phone_preference(include_phone):
     assert result.resume_md
     assert (PHONE_DIGITS in digits(result.resume_md)) is include_phone
     assert "vtulai@yahoo.com" in result.resume_md
+
+
+@pytest.mark.integration
+def test_real_generation_keeps_graduation_year_when_requested():
+    system = build_system_prompt(RESUME, JOB, Preferences(include_graduation_year=True), 2026)
+    message = "Generate my custom resume now. Do not ask questions."
+    result = ai.ask_structured(ai.get_client(), build_messages(system, [], message), GenerateResult)
+    assert result.resume_md
+    assert "1995" in education_section(result.resume_md)
 
 
 def section(md: str, title: str) -> str:

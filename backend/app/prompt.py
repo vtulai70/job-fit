@@ -24,8 +24,7 @@ Tailor the user's baseline resume to the target job description to maximize the 
 
 # Rules
 
-- Do not include any year in the Education section (graduation or completion). For example,
-  "M.Sc. - Some University (Completed 1995)" becomes "M.Sc. - Some University".
+- Show or hide years in the Education section exactly as the user preferences below say.
 - Do not add technologies, tools or programming languages that are not in the baseline resume, even
   ones commonly used alongside them. Every tool you list must appear in the baseline. If the job asks
   for one that is missing (e.g. Azure), emphasize the closest one the user has (e.g. AWS) and do not
@@ -55,6 +54,11 @@ Respond with JSON fields:
 
 PHONE_INCLUDE = "include the phone number from the baseline resume in the contact details"
 PHONE_EXCLUDE = "do NOT include the phone number anywhere in the resume; keep the other contact details"
+GRADUATION_INCLUDE = "keep the graduation or completion year of each degree as in the baseline resume"
+GRADUATION_EXCLUDE = (
+    "do NOT include any year in the Education section (graduation or completion). For example, "
+    '"M.Sc. - Some University (Completed 1995)" becomes "M.Sc. - Some University"'
+)
 
 
 def experience_rules(prefs: Preferences, year: int) -> str:
@@ -98,6 +102,7 @@ def build_system_prompt(baseline: str | None, job_description: str, prefs: Prefe
 - Tone: {prefs.tone or "no preference"}
 - Notes: {prefs.notes or "none"}
 - Phone number: {PHONE_INCLUDE if prefs.include_phone else PHONE_EXCLUDE}
+- Graduation year: {GRADUATION_INCLUDE if prefs.include_graduation_year else GRADUATION_EXCLUDE}
 - Experience (the current year is {year}; place each role by its end year):
 {experience_rules(prefs, year)}
 

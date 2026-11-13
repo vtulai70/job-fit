@@ -110,6 +110,15 @@ export default function PreferencesPanel({ initial, onChange }: Props) {
           />
           Include phone number in generated resume
         </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={prefs.include_graduation_year}
+            onChange={(e) => update({ include_graduation_year: e.target.checked })}
+            className="h-4 w-4 accent-primary"
+          />
+          Include university graduation year in generated resume
+        </label>
       </fieldset>
       <fieldset className={groupClass}>
         <legend className="text-sm font-semibold text-primary">PDF</legend>
