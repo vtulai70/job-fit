@@ -337,14 +337,16 @@ function chatLines() {
   return [...screen.getByRole("log", { name: "Conversation" }).children].map((el) => el.textContent);
 }
 
-const DEFAULT_NOTE = "Model: openai/gpt-oss-120b\nOptimization level: Smart integration\nProfessional Experience: 15 years\nEarlier Experience: 10 years\nTone: concise";
+const DEFAULT_NOTE = "Model: openai/gpt-oss-120b\nOptimization level: Smart integration\nTone: concise";
 
-test("settings note lists model, experience years and tone; notes only when set", () => {
+test("settings note lists model, optimization level and tone; notes only when set; no experience years", () => {
   expect(settingsNote(PREFS)).toBe(DEFAULT_NOTE);
+  expect(settingsNote({ ...PREFS, professional_years: 8, earlier_years: 0 })).toBe(DEFAULT_NOTE);
+  expect(DEFAULT_NOTE).not.toMatch(/Experience/);
   expect(settingsNote({ ...PREFS, optimization: "light" })).toContain("\nOptimization level: Light polish\n");
   expect(settingsNote({ ...PREFS, optimization: "full" }).split("\n")[1]).toBe("Optimization level: Full tailoring");
   expect(settingsNote({ ...PREFS, tone: "  ", notes: " Lead with AI ", earlier_years: 0 })).toBe(
-    "Model: openai/gpt-oss-120b\nOptimization level: Smart integration\nProfessional Experience: 15 years\nEarlier Experience: 0 years\nTone: no preference\nNotes: Lead with AI",
+    "Model: openai/gpt-oss-120b\nOptimization level: Smart integration\nTone: no preference\nNotes: Lead with AI",
   );
 });
 
@@ -401,7 +403,7 @@ test("after changing settings the next generate's note shows them", async () => 
   await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
   await screen.findByText("Here is your resume.");
   expect(chatLines()[0]).toBe(
-    "Model: openai/gpt-5.4-nano\nOptimization level: Full tailoring\nProfessional Experience: 8 years\nEarlier Experience: 10 years\nTone: no preference\nNotes: Stress mentoring",
+    "Model: openai/gpt-5.4-nano\nOptimization level: Full tailoring\nTone: no preference\nNotes: Stress mentoring",
   );
 });
 

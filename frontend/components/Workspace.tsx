@@ -19,8 +19,6 @@ export function settingsNote(prefs: api.Preferences): string {
   const lines = [
     `Model: ${prefs.model}`,
     `Optimization level: ${api.optimizationLabel(prefs.optimization)}`,
-    `Professional Experience: ${prefs.professional_years} years`,
-    `Earlier Experience: ${prefs.earlier_years} years`,
     `Tone: ${prefs.tone.trim() || "no preference"}`,
   ];
   if (prefs.notes.trim()) lines.push(`Notes: ${prefs.notes.trim()}`);

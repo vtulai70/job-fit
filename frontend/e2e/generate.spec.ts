@@ -108,10 +108,10 @@ test("chat shows the model and settings before each prompt it sends", async ({ p
   await expect(chat.getByText("Done.")).toBeVisible();
 
   await expect(chat.locator(":scope > *")).toHaveText([
-    "Model: openai/gpt-5.4-nano\nOptimization level: Light polish\nProfessional Experience: 9 years\nEarlier Experience: 3 years\nTone: warm",
+    "Model: openai/gpt-5.4-nano\nOptimization level: Light polish\nTone: warm",
     "You: Please generate my custom resume for this job description.",
     "AI: Which focus?",
-    "Model: openai/gpt-oss-120b\nOptimization level: Smart integration\nProfessional Experience: 9 years\nEarlier Experience: 3 years\nTone: no preference\nNotes: Stress mentoring",
+    "Model: openai/gpt-oss-120b\nOptimization level: Smart integration\nTone: no preference\nNotes: Stress mentoring",
     "You: Platform",
     "AI: Done.",
   ]);
@@ -119,8 +119,6 @@ test("chat shows the model and settings before each prompt it sends", async ({ p
   expect(firstNote.split("\n")).toEqual([
     "Model: openai/gpt-5.4-nano",
     "Optimization level: Light polish",
-    "Professional Experience: 9 years",
-    "Earlier Experience: 3 years",
     "Tone: warm",
   ]);
 });
