@@ -55,7 +55,7 @@ export default function Workspace() {
       const result = await api.generate({ job_description: jobDescription, message: text, history });
       setMessages([...sent, { role: "assistant", content: result.reply }]);
       if (result.resume_md) {
-        setCustomResume({ company: result.company ?? "Unknown company", content_md: result.resume_md });
+        setCustomResume({ company: result.company ?? "Unknown company", content_md: result.resume_md, model: result.model });
       }
     } catch {
       setMessages([...sent, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
@@ -74,6 +74,7 @@ export default function Workspace() {
       job_description: jobDescription,
       content_md: customResume!.content_md,
       style: prefs!.style,
+      model: customResume!.model,
     });
     setHistory([entry, ...history]);
   }

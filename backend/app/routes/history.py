@@ -6,6 +6,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
+from app.ai import Model
 from app.auth import UserId
 from app.db import Db, now
 from app.pdf import render_pdf
@@ -19,6 +20,7 @@ class HistoryIn(BaseModel):
     job_description: str
     content_md: str
     style: Style
+    model: Model
 
 
 class HistoryEntry(BaseModel):
@@ -26,13 +28,14 @@ class HistoryEntry(BaseModel):
     company: str
     style: Style
     downloaded_at: str
+    model: str | None
 
 
 @router.get("")
 def list_history(user_id: UserId, db: Db) -> list[HistoryEntry]:
     """All downloads for the user, newest first."""
     rows = db.execute(
-        "SELECT id, company, style, downloaded_at FROM custom_resumes WHERE user_id = ? "
+        "SELECT id, company, style, downloaded_at, model FROM custom_resumes WHERE user_id = ? "
         "ORDER BY downloaded_at DESC, id DESC",
         (user_id,),
     ).fetchall()
@@ -45,12 +48,12 @@ def add_history(body: HistoryIn, user_id: UserId, db: Db) -> HistoryEntry:
     downloaded_at = now()
     cursor = db.execute(
         "INSERT INTO custom_resumes "
-        "(user_id, company, job_description, content_md, style, downloaded_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (user_id, body.company, body.job_description, body.content_md, body.style, downloaded_at),
+        "(user_id, company, job_description, content_md, style, downloaded_at, model) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (user_id, body.company, body.job_description, body.content_md, body.style, downloaded_at, body.model),
     )
     return HistoryEntry(
-        id=cursor.lastrowid, company=body.company, style=body.style, downloaded_at=downloaded_at
+        id=cursor.lastrowid, company=body.company, style=body.style, downloaded_at=downloaded_at, model=body.model
     )
 
 

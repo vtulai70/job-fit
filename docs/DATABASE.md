@@ -6,7 +6,7 @@ The full schema is in `docs/schema.json`. This document explains the approach.
 
 - SQLite file at `data/jobfit.db`. In Docker, `data/` is the host-mounted volume, so data survives container restarts.
 - Access through Python's stdlib `sqlite3`. No ORM: four small tables and simple queries do not need one.
-- On startup the backend creates the `data/` directory and the tables if missing (`CREATE TABLE IF NOT EXISTS`). A user row is created on each Clerk user's first request. No migration tool for the MVP.
+- On startup the backend creates the `data/` directory and the tables if missing (`CREATE TABLE IF NOT EXISTS`). A user row is created on each Clerk user's first request. No migration tool for the MVP; the one column added later (`custom_resumes.model`) is added by `init_db` with `ALTER TABLE` when missing.
 - One connection per request (FastAPI dependency), with `PRAGMA foreign_keys = ON` and `row_factory = sqlite3.Row`.
 - Timestamps are ISO-8601 UTC text.
 - Every query is filtered by the current user's `id`, so the schema is multi-user ready from day one.
@@ -17,7 +17,7 @@ The full schema is in `docs/schema.json`. This document explains the approach.
 |---|---|---|
 | `users` | Accounts; `username` holds the Clerk user id (e.g. `user_2abc...`) | 1 |
 | `baseline_resumes` | Current baseline resume as markdown; upload replaces it | 0..1 |
-| `custom_resumes` | Download history: company, job description, generated markdown, PDF style, timestamp | 0..n |
+| `custom_resumes` | Download history: company, job description, generated markdown, PDF style, timestamp, generating model | 0..n |
 | `preferences` | JSON object of preferences; no row means defaults | 0..1 |
 
 ## SQL
@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS custom_resumes (
     job_description TEXT NOT NULL,
     content_md      TEXT NOT NULL,
     style           TEXT NOT NULL,
-    downloaded_at   TEXT NOT NULL
+    downloaded_at   TEXT NOT NULL,
+    model           TEXT            -- model that generated the resume; NULL for rows saved before it was recorded
 );
 CREATE INDEX IF NOT EXISTS idx_custom_resumes_user_downloaded
     ON custom_resumes (user_id, downloaded_at);

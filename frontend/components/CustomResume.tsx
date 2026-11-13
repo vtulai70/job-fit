@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-import type { Style } from "@/lib/api";
+import type { Model, Style } from "@/lib/api";
 
-export type CustomResumeData = { company: string; content_md: string };
+/** `model` is the model that generated the resume. */
+export type CustomResumeData = { company: string; content_md: string; model: Model };
 
 type Mode = "markdown" | "preview";
 

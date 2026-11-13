@@ -34,7 +34,8 @@
         { "name": "job_description", "type": "TEXT", "constraints": ["NOT NULL"] },
         { "name": "content_md", "type": "TEXT", "constraints": ["NOT NULL"] },
         { "name": "style", "type": "TEXT", "constraints": ["NOT NULL"], "description": "PDF style used at download time" },
-        { "name": "downloaded_at", "type": "TEXT", "constraints": ["NOT NULL"] }
+        { "name": "downloaded_at", "type": "TEXT", "constraints": ["NOT NULL"] },
+        { "name": "model", "type": "TEXT", "constraints": [], "description": "OpenRouter model that generated the resume; NULL for rows saved before it was recorded" }
       ],
       "indexes": [
         { "name": "idx_custom_resumes_user_downloaded", "columns": ["user_id", "downloaded_at"] }

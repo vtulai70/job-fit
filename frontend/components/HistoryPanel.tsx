@@ -1,6 +1,6 @@
 import { type HistoryEntry, pdfUrl } from "@/lib/api";
 
-/** Past downloads, newest first, each with a re-download link. */
+/** Past downloads, newest first: company, time, generating model (when recorded) and a re-download link. */
 export default function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
   return (
     <section aria-labelledby="history-heading" className="rounded-lg border border-line bg-surface p-4">
@@ -16,6 +16,7 @@ export default function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
               <span>
                 <span className="font-semibold">{entry.company}</span>
                 <span className="ml-3 text-ink/60">{new Date(entry.downloaded_at).toLocaleString()}</span>
+                {entry.model && <span className="ml-3 font-mono text-xs text-ink/60">{entry.model}</span>}
               </span>
               <a
                 href={pdfUrl(entry.id)}

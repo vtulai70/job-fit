@@ -9,7 +9,7 @@ PROTECTED = [
     ("GET", "/api/resume/baseline", None),
     ("PUT", "/api/resume/baseline", {"content_md": "x"}),
     ("GET", "/api/history", None),
-    ("POST", "/api/history", {"company": "A", "job_description": "j", "content_md": "c", "style": "modern"}),
+    ("POST", "/api/history", {"company": "A", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b"}),
     ("GET", "/api/history/1/pdf", None),
     ("GET", "/api/preferences", None),
     ("PUT", "/api/preferences", {"style": "modern"}),
@@ -35,7 +35,7 @@ def two_users(client):
     client.put("/api/preferences", json={"style": "classic"})
     entry_id = client.post(
         "/api/history",
-        json={"company": "Acme", "job_description": "j", "content_md": "c", "style": "modern"},
+        json={"company": "Acme", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b"},
     ).json()["id"]
     act_as("user_bob")
     yield client, entry_id

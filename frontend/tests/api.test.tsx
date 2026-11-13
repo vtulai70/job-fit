@@ -4,7 +4,13 @@ import * as api from "@/lib/api";
 
 import { mockFetch } from "./fetchMock";
 
-const ENTRY = { company: "Acme", job_description: "JD", content_md: "# R", style: "modern" as const };
+const ENTRY = {
+  company: "Acme",
+  job_description: "JD",
+  content_md: "# R",
+  style: "modern" as const,
+  model: "openai/gpt-6-sol" as const,
+};
 
 test("getBaseline returns the saved baseline", async () => {
   mockFetch({ "GET /api/resume/baseline": { body: { content_md: "# Me", updated_at: "t" } } });

@@ -45,7 +45,7 @@ test("two Clerk users do not see each other's data", async ({ page }) => {
   await page.locator('input[type="file"]').setInputFiles(RESUME);
   await expect(page.getByLabel("Baseline resume content")).toContainText("Professional Summary");
   const created = await page.request.post("/api/history", {
-    data: { company: "Alice Only Inc", job_description: "j", content_md: await readFile(RESUME, "utf-8"), style: "modern" },
+    data: { company: "Alice Only Inc", job_description: "j", content_md: await readFile(RESUME, "utf-8"), style: "modern", model: "openai/gpt-oss-120b" },
   });
   expect(created.status()).toBe(201);
   await signOut(page);

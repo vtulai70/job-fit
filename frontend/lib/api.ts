@@ -29,13 +29,15 @@ export type Preferences = {
 
 export type Baseline = { content_md: string | null; updated_at: string | null };
 
-export type HistoryEntry = { id: number; company: string; style: Style; downloaded_at: string };
+/** `model` is null for downloads saved before the model was recorded. */
+export type HistoryEntry = { id: number; company: string; style: Style; downloaded_at: string; model: Model | null };
 
 export type NewHistoryEntry = {
   company: string;
   job_description: string;
   content_md: string;
   style: Style;
+  model: Model;
 };
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -88,6 +90,6 @@ export type ChatEntry = ChatMessage | { role: "info"; content: string };
 
 export type GenerateRequest = { job_description: string; message: string; history: ChatMessage[] };
 
-export type GenerateResult = { reply: string; company: string | null; resume_md: string | null };
+export type GenerateResult = { reply: string; company: string | null; resume_md: string | null; model: Model };
 
 export const generate = (req: GenerateRequest) => request<GenerateResult>("POST", "/api/generate", req);

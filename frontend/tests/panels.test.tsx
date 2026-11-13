@@ -27,8 +27,8 @@ test("history lists entries with re-download links", () => {
   render(
     <HistoryPanel
       entries={[
-        { id: 2, company: "Beta", style: "modern", downloaded_at: "2026-11-11T10:00:00Z" },
-        { id: 1, company: "Acme", style: "classic", downloaded_at: "2026-11-10T10:00:00Z" },
+        { id: 2, company: "Beta", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-6-sol" },
+        { id: 1, company: "Acme", style: "classic", downloaded_at: "2026-11-10T10:00:00Z", model: null },
       ]}
     />,
   );
@@ -36,6 +36,8 @@ test("history lists entries with re-download links", () => {
   expect(items).toHaveLength(2);
   expect(within(items[0]).getByText("Beta")).toBeInTheDocument();
   expect(within(items[0]).getByText(new Date("2026-11-11T10:00:00Z").toLocaleString())).toBeInTheDocument();
+  expect(within(items[0]).getByText("openai/gpt-6-sol")).toBeInTheDocument();
+  expect(items[1]).not.toHaveTextContent(/openai|anthropic|google/);
   expect(screen.getByRole("link", { name: "Download Beta resume" })).toHaveAttribute("href", "/api/history/2/pdf");
   expect(screen.getByRole("link", { name: "Download Acme resume" })).toHaveAttribute("href", "/api/history/1/pdf");
 });

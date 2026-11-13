@@ -5,6 +5,7 @@ ENTRY = {
     "job_description": "Director of Engineering",
     "content_md": "# Jane Doe\n\n## Experience\n\n- Led teams",
     "style": "professional",
+    "model": "anthropic/claude-sonnet-5.5",
 }
 
 
@@ -19,7 +20,29 @@ def test_add_entry(signed_in):
     assert body["company"] == "Acme Corp"
     assert body["style"] == "professional"
     assert body["downloaded_at"].endswith("Z")
+    assert body["model"] == "anthropic/claude-sonnet-5.5"
     assert isinstance(body["id"], int)
+
+
+def test_history_lists_the_model(signed_in):
+    signed_in.post("/api/history", json=ENTRY)
+    signed_in.post("/api/history", json={**ENTRY, "model": "openai/gpt-6-sol"})
+    models = [e["model"] for e in signed_in.get("/api/history").json()]
+    assert models == ["openai/gpt-6-sol", "anthropic/claude-sonnet-5.5"]
+
+
+def test_history_requires_a_known_model(signed_in):
+    assert signed_in.post("/api/history", json={k: v for k, v in ENTRY.items() if k != "model"}).status_code == 422
+    assert signed_in.post("/api/history", json={**ENTRY, "model": "acme/unknown"}).status_code == 422
+
+
+def test_entries_saved_before_the_model_column_list_without_model(signed_in):
+    signed_in.post("/api/history", json=ENTRY)
+    conn = db.connect()
+    with conn:
+        conn.execute("UPDATE custom_resumes SET model = NULL")
+    conn.close()
+    assert signed_in.get("/api/history").json()[0]["model"] is None
 
 
 def test_list_newest_first(signed_in):

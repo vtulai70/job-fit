@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS custom_resumes (
     job_description TEXT NOT NULL,
     content_md      TEXT NOT NULL,
     style           TEXT NOT NULL,
-    downloaded_at   TEXT NOT NULL
+    downloaded_at   TEXT NOT NULL,
+    model           TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_custom_resumes_user_downloaded
     ON custom_resumes (user_id, downloaded_at);
@@ -62,10 +63,13 @@ def add_user(conn: sqlite3.Connection, username: str) -> None:
 
 
 def init_db() -> None:
-    """Create the database file and tables if missing."""
+    """Create the database file and tables if missing, and add columns newer than the file."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = connect()
     conn.executescript(SCHEMA)
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(custom_resumes)")}
+    if "model" not in columns:
+        conn.execute("ALTER TABLE custom_resumes ADD COLUMN model TEXT")
     conn.close()
 
 

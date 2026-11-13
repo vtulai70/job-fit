@@ -70,6 +70,7 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
       job_description: "Director of Engineering",
       content_md: await readFile(RESUME, "utf-8"),
       style: "modern",
+      model: "openai/gpt-6-sol",
     },
   });
   expect(response.status()).toBe(201);
@@ -77,6 +78,7 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
   await page.reload();
   const history = page.getByRole("region", { name: "Download history" });
   await expect(history.getByText("Globex Corporation")).toBeVisible();
+  await expect(history.getByRole("listitem").filter({ hasText: "Globex Corporation" })).toContainText("openai/gpt-6-sol");
 
   const downloadPromise = page.waitForEvent("download");
   await history.getByRole("link", { name: "Download Globex Corporation resume" }).click();

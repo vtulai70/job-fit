@@ -172,7 +172,10 @@ def test_generate_uses_stored_baseline_preferences_and_history(signed_in, use_ai
     })
 
     assert response.status_code == 200
-    assert response.json() == {"reply": "Done", "company": "Initech", "experience_plan": [], "resume_md": "# Tailored"}
+    assert response.json() == {
+        "reply": "Done", "company": "Initech", "experience_plan": [], "resume_md": "# Tailored",
+        "model": "openai/gpt-oss-120b",
+    }
     messages = sent_messages(client)
     system = messages[0]["content"]
     for text in ["# Stored baseline", "Director at Initech", "warm", "Mention mentoring"]:
@@ -195,6 +198,14 @@ def test_generate_sends_stored_graduation_year_preference(signed_in, use_ai, inc
     client = use_ai(RESUME_RESULT)
     signed_in.post("/api/generate", json={"job_description": "Director at Initech", "message": "go"})
     assert f"Graduation year: {expected}" in sent_messages(client)[0]["content"]
+
+
+def test_generate_names_and_uses_the_saved_model(signed_in, use_ai):
+    signed_in.put("/api/preferences", json={"model": "anthropic/claude-haiku-5.5"})
+    client = use_ai(RESUME_RESULT)
+    response = signed_in.post("/api/generate", json={"job_description": "x", "message": "go"})
+    assert response.json()["model"] == "anthropic/claude-haiku-5.5"
+    assert client.chat.completions.parse.call_args.kwargs["model"] == "anthropic/claude-haiku-5.5"
 
 
 def test_generate_sends_experience_windows_for_this_year(signed_in, use_ai):

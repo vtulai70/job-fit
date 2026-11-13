@@ -17,7 +17,9 @@ const PREFS = {
   earlier_years: 10,
   model: "openai/gpt-oss-120b",
 };
-const HISTORY = [{ id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z" }];
+const HISTORY = [
+  { id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-oss-120b" },
+];
 
 function mockData(baseline: string | null = "# Saved resume") {
   return mockFetch({
@@ -72,8 +74,18 @@ test("job description is kept as typed", async () => {
   expect(box).toHaveValue("Director of Engineering");
 });
 
-const RESUME_RESULT = { reply: "Here is your resume.", company: "Initech", resume_md: "# Tailored for Initech" };
-const QUESTION_RESULT = { reply: "Which team size should I emphasize?", company: "Initech", resume_md: null };
+const RESUME_RESULT = {
+  reply: "Here is your resume.",
+  company: "Initech",
+  resume_md: "# Tailored for Initech",
+  model: "openai/gpt-oss-120b",
+};
+const QUESTION_RESULT = {
+  reply: "Which team size should I emphasize?",
+  company: "Initech",
+  resume_md: null,
+  model: "openai/gpt-oss-120b",
+};
 
 function mockChat(...results: { status?: number; body?: unknown }[]) {
   const fetchMock = mockData();
@@ -158,12 +170,18 @@ test("a failed generate shows an error message in the chat", async () => {
   expect(screen.getByRole("button", { name: "Generate custom resume" })).toBeEnabled();
 });
 
-test("downloading the generated resume records history with company, job and style", async () => {
+test("downloading the generated resume records history with company, job, style and model", async () => {
   const fetchMock = mockChat({ body: RESUME_RESULT });
   const base = fetchMock.getMockImplementation()!;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
     url === "/api/history" && init?.method === "POST"
-      ? Response.json({ id: 9, company: "Initech", style: "modern", downloaded_at: "2026-11-11T12:00:00Z" })
+      ? Response.json({
+          id: 9,
+          company: "Initech",
+          style: "modern",
+          downloaded_at: "2026-11-11T12:00:00Z",
+          model: "openai/gpt-oss-120b",
+        })
       : base(url, init),
   );
   const assign = vi.fn();
@@ -179,8 +197,20 @@ test("downloading the generated resume records history with company, job and sty
     job_description: "Director at Initech",
     content_md: "# Tailored for Initech",
     style: "modern",
+    model: "openai/gpt-oss-120b",
   });
   expect(screen.getByRole("link", { name: "Download Initech resume" })).toBeInTheDocument();
+});
+
+test("download records the model that generated the resume, not a model chosen afterwards", async () => {
+  const fetchMock = mockChat({ body: { ...RESUME_RESULT, model: "anthropic/claude-haiku-5.5" } });
+  mockHistoryPost(fetchMock);
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await screen.findByLabelText("Custom resume content");
+  await userEvent.selectOptions(screen.getByLabelText("AI model"), "openai/gpt-6-sol");
+  await userEvent.click(screen.getByRole("button", { name: "Download PDF" }));
+  await vi.waitFor(() => expect(postedHistory(fetchMock).model).toBe("anthropic/claude-haiku-5.5"));
 });
 
 function mockHistoryPost(fetchMock: ReturnType<typeof mockData>) {

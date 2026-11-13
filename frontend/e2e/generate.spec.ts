@@ -9,12 +9,15 @@ import { signIn } from "./helpers";
 const RESUME = path.join(__dirname, "..", "..", "resume.md");
 const TAILORED = "# Voicu Tulai\n\n## Professional Summary\n\nEngineering leader for Umbrella Corp.";
 
+/** The model the mocked /api/generate says it used (the real route returns the saved model). */
+const GENERATED_BY = "anthropic/claude-haiku-5.5";
+
 /** Answer /api/generate with the given replies in order, recording request bodies. */
 async function mockGenerate(page: Page, replies: object[]) {
   const bodies: Record<string, unknown>[] = [];
   await page.route("**/api/generate", async (route) => {
     bodies.push(route.request().postDataJSON());
-    await route.fulfill({ json: replies.shift() });
+    await route.fulfill({ json: { model: GENERATED_BY, ...replies.shift() } });
   });
   return bodies;
 }
@@ -50,8 +53,10 @@ test("generate, download PDF, and see it in history", async ({ page }) => {
 
   const history = page.getByRole("region", { name: "Download history" });
   await expect(history.getByText("Umbrella Corp")).toBeVisible();
+  await expect(history.getByText(GENERATED_BY)).toBeVisible();
   await page.reload();
   await expect(history.getByText("Umbrella Corp")).toBeVisible();
+  await expect(history.getByText(GENERATED_BY)).toBeVisible();
 });
 
 test("clarifying question is answered in chat before the resume", async ({ page }) => {
