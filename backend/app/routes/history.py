@@ -57,6 +57,12 @@ def add_history(body: HistoryIn, user_id: UserId, db: Db) -> HistoryEntry:
     )
 
 
+@router.delete("", status_code=204)
+def clear_history(user_id: UserId, db: Db) -> None:
+    """Delete all of the user's downloads."""
+    db.execute("DELETE FROM custom_resumes WHERE user_id = ?", (user_id,))
+
+
 @router.get("/{entry_id}/pdf")
 def history_pdf(entry_id: int, user_id: UserId, db: Db) -> Response:
     """Render a past download as PDF."""

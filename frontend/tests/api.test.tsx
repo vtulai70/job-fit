@@ -55,3 +55,14 @@ test("downloadCustomResume does not download if recording fails", async () => {
   await expect(api.downloadCustomResume(ENTRY)).rejects.toThrow();
   expect(assign).not.toHaveBeenCalled();
 });
+
+test("clearHistory sends DELETE /api/history", async () => {
+  const fetchMock = mockFetch({ "DELETE /api/history": { status: 204 } });
+  await api.clearHistory();
+  expect(fetchMock).toHaveBeenCalledWith("/api/history", { method: "DELETE" });
+});
+
+test("clearHistory throws when the server fails", async () => {
+  mockFetch({ "DELETE /api/history": { status: 500 } });
+  await expect(api.clearHistory()).rejects.toThrow("DELETE /api/history failed: 500");
+});

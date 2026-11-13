@@ -1,12 +1,27 @@
 import { type HistoryEntry, pdfUrl } from "@/lib/api";
 
-/** Past downloads, newest first: company, time, generating model (when recorded) and a re-download link. */
-export default function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
+type Props = { entries: HistoryEntry[]; onClear: () => void };
+
+export const CLEAR_CONFIRM = "Delete all download history? This cannot be undone.";
+
+/** Past downloads, newest first: company, time, generating model (when recorded) and a re-download link.
+ * "Clear history" asks for confirmation, then calls onClear. */
+export default function HistoryPanel({ entries, onClear }: Props) {
   return (
     <section aria-labelledby="history-heading" className="rounded-lg border border-line bg-surface p-4">
-      <h2 id="history-heading" className="mb-2 font-semibold">
-        Download history
-      </h2>
+      <div className="mb-2 flex items-center justify-between">
+        <h2 id="history-heading" className="font-semibold">
+          Download history
+        </h2>
+        {entries.length > 0 && (
+          <button
+            onClick={() => window.confirm(CLEAR_CONFIRM) && onClear()}
+            className="rounded border border-line px-3 py-1 text-sm hover:border-primary hover:text-primary"
+          >
+            Clear history
+          </button>
+        )}
+      </div>
       {entries.length === 0 ? (
         <p className="text-sm text-ink/60">No downloads yet.</p>
       ) : (

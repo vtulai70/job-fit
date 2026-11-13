@@ -87,3 +87,26 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
   const pdf = await readFile(await download.path());
   expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
 });
+
+test("clear history asks first, then deletes every entry", async ({ page }) => {
+  await signIn(page);
+  const entry = { job_description: "j", content_md: "# Me", style: "modern", model: "openai/gpt-oss-120b" };
+  for (const company of ["Clear Co One", "Clear Co Two"]) {
+    expect((await page.request.post("/api/history", { data: { ...entry, company } })).status()).toBe(201);
+  }
+  await page.reload();
+  const history = page.getByRole("region", { name: "Download history" });
+  await expect(history.getByText("Clear Co Two")).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await history.getByRole("button", { name: "Clear history" }).click();
+  await expect(history.getByText("Clear Co Two")).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await history.getByRole("button", { name: "Clear history" }).click();
+  await expect(history.getByText("No downloads yet.")).toBeVisible();
+  await expect(history.getByRole("button", { name: "Clear history" })).toHaveCount(0);
+  expect(await (await page.request.get("/api/history")).json()).toEqual([]);
+  await page.reload();
+  await expect(history.getByText("No downloads yet.")).toBeVisible();
+});

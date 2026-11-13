@@ -12,6 +12,7 @@ import PreferencesPanel from "./PreferencesPanel";
 import ResumePanel from "./ResumePanel";
 
 export const GENERATE_MESSAGE = "Please generate my custom resume for this job description.";
+export const CLEAR_FAILED = "Could not clear the download history. Please try again.";
 
 /** Signed-in workspace: loads and saves the user's data and runs the AI chat (after pending preference saves). */
 export default function Workspace() {
@@ -32,6 +33,16 @@ export default function Workspace() {
 
   async function uploadBaseline(content: string) {
     setBaseline((await api.putBaseline(content)).content_md);
+  }
+
+  /** Delete the history on the server, then empty the list; on failure keep it and say so. */
+  async function clearHistory() {
+    try {
+      await api.clearHistory();
+      setHistory([]);
+    } catch {
+      window.alert(CLEAR_FAILED);
+    }
   }
 
   /** Save each change in order; a failed save does not block later ones. */
@@ -91,7 +102,7 @@ export default function Workspace() {
           onChange={editCustomResume}
           onDownload={downloadCustomResume}
         />
-        <HistoryPanel entries={history} />
+        <HistoryPanel entries={history} onClear={clearHistory} />
         {prefs && <PreferencesPanel initial={prefs} onChange={savePreferences} />}
       </main>
       <ChatSidebar

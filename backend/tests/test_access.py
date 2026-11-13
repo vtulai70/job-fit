@@ -11,6 +11,7 @@ PROTECTED = [
     ("GET", "/api/history", None),
     ("POST", "/api/history", {"company": "A", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b"}),
     ("GET", "/api/history/1/pdf", None),
+    ("DELETE", "/api/history", None),
     ("GET", "/api/preferences", None),
     ("PUT", "/api/preferences", {"style": "modern"}),
     ("POST", "/api/preview", {"content_md": "x", "style": "modern"}),
@@ -63,3 +64,15 @@ def test_writes_do_not_leak_back(two_users):
     client.put("/api/resume/baseline", json={"content_md": "other resume"})
     act_as("user_alice")
     assert client.get("/api/resume/baseline").json()["content_md"] == "user resume"
+
+
+def test_clearing_history_leaves_other_users_entries(two_users):
+    client, entry_id = two_users
+    client.post(
+        "/api/history",
+        json={"company": "Bob Co", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b"},
+    )
+    assert client.delete("/api/history").status_code == 204
+    assert client.get("/api/history").json() == []
+    act_as("user_alice")
+    assert [e["id"] for e in client.get("/api/history").json()] == [entry_id]

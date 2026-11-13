@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
-import Workspace, { GENERATE_MESSAGE } from "@/components/Workspace";
+import Workspace, { CLEAR_FAILED, GENERATE_MESSAGE } from "@/components/Workspace";
 
 import { mockFetch } from "./fetchMock";
 
@@ -370,4 +370,33 @@ test("generate waits for a pending preference save", async () => {
   finishSave();
   expect(await screen.findByText("Here is your resume.")).toBeInTheDocument();
   expect(generateBodies(fetchMock)).toHaveLength(1);
+});
+
+function mockClear(status: number) {
+  const fetchMock = mockData();
+  const base = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
+    url === "/api/history" && init?.method === "DELETE" ? new Response(null, { status }) : base(url, init),
+  );
+  vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
+  return fetchMock;
+}
+
+test("clearing history deletes it on the server and empties the list", async () => {
+  const fetchMock = mockClear(204);
+  render(<Workspace />);
+  expect(await screen.findByRole("link", { name: "Download Acme resume" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Clear history" }));
+  expect(await screen.findByText("No downloads yet.")).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledWith("/api/history", { method: "DELETE" });
+});
+
+test("history stays and the user is told when the server fails to clear it", async () => {
+  mockClear(500);
+  const alert = vi.fn();
+  vi.stubGlobal("alert", alert);
+  render(<Workspace />);
+  await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
+  await waitFor(() => expect(alert).toHaveBeenCalledWith(CLEAR_FAILED));
+  expect(screen.getByRole("link", { name: "Download Acme resume" })).toBeInTheDocument();
 });

@@ -18,7 +18,7 @@ Written ahead of the code (Step 1); update as code lands.
 - `app/auth.py` - Clerk session verification (`clerk-backend-api` `authenticate_request`, cookie or Bearer); `CurrentUser` (Clerk user id) and `UserId` (local db id, row created on first request)
 - `app/db.py` - schema (see `docs/DATABASE.md`), `init_db` (also adds the `custom_resumes.model` column to older databases), `connect`, `Db` per-request connection dependency
 - `app/routes/resume.py` - `GET/PUT /api/resume/baseline`
-- `app/routes/history.py` - `GET/POST /api/history` (POST requires `model`, validated as `Model`; listed entries have `model` or null for older rows), `GET /api/history/{id}/pdf`
+- `app/routes/history.py` - `GET/POST/DELETE /api/history` (DELETE removes all of the current user's entries, 204) (POST requires `model`, validated as `Model`; listed entries have `model` or null for older rows), `GET /api/history/{id}/pdf`
 - `app/routes/preview.py` - `POST /api/preview` (`{content_md, style}` -> `{html}`), the `render_html` document the PDF is made from
 - `app/routes/preferences.py` - `GET/PUT /api/preferences`, `Preferences` model (style, tone, max_pages, notes, include_phone, include_graduation_year (default false), professional_years 1-50, earlier_years 0-50, model), `load_preferences`; new keys get defaults so older stored JSON still loads
 - `app/pdf.py` - markdown -> HTML -> PDF (WeasyPrint), styles `professional`, `modern`, `classic`

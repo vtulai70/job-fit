@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
-import HistoryPanel from "@/components/HistoryPanel";
+import HistoryPanel, { CLEAR_CONFIRM } from "@/components/HistoryPanel";
 import PreferencesPanel from "@/components/PreferencesPanel";
 import type { Preferences } from "@/lib/api";
 
@@ -19,13 +19,35 @@ const PREFS: Preferences = {
 };
 
 test("history shows empty state", () => {
-  render(<HistoryPanel entries={[]} />);
+  render(<HistoryPanel onClear={vi.fn()} entries={[]} />);
   expect(screen.getByText("No downloads yet.")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Clear history" })).not.toBeInTheDocument();
+});
+
+const ENTRY = { id: 1, company: "Acme", style: "modern" as const, downloaded_at: "2026-11-10T10:00:00Z", model: null };
+
+test("clear history asks for confirmation, then calls onClear", async () => {
+  const confirm = vi.fn().mockReturnValue(true);
+  vi.stubGlobal("confirm", confirm);
+  const onClear = vi.fn();
+  render(<HistoryPanel entries={[ENTRY]} onClear={onClear} />);
+  await userEvent.click(screen.getByRole("button", { name: "Clear history" }));
+  expect(confirm).toHaveBeenCalledWith(CLEAR_CONFIRM);
+  expect(onClear).toHaveBeenCalledOnce();
+});
+
+test("cancelling the confirmation keeps the history", async () => {
+  vi.stubGlobal("confirm", vi.fn().mockReturnValue(false));
+  const onClear = vi.fn();
+  render(<HistoryPanel entries={[ENTRY]} onClear={onClear} />);
+  await userEvent.click(screen.getByRole("button", { name: "Clear history" }));
+  expect(onClear).not.toHaveBeenCalled();
 });
 
 test("history lists entries with re-download links", () => {
   render(
     <HistoryPanel
+      onClear={vi.fn()}
       entries={[
         { id: 2, company: "Beta", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-6-sol" },
         { id: 1, company: "Acme", style: "classic", downloaded_at: "2026-11-10T10:00:00Z", model: null },

@@ -65,6 +65,12 @@ export const listHistory = () => request<HistoryEntry[]>("GET", "/api/history");
 export const addHistory = (entry: NewHistoryEntry) =>
   request<HistoryEntry>("POST", "/api/history", entry);
 
+/** Delete all of the user's download history (the server answers 204, no body). */
+export async function clearHistory() {
+  const response = await fetch("/api/history", { method: "DELETE" });
+  if (!response.ok) throw new Error(`DELETE /api/history failed: ${response.status}`);
+}
+
 export const pdfUrl = (id: number) => `/api/history/${id}/pdf`;
 
 /** The HTML the PDF would be rendered from, in the given style. */

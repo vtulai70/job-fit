@@ -123,3 +123,19 @@ def test_pdf_rendered_from_stored_content_and_style(signed_in, monkeypatch):
     entry_id = signed_in.post("/api/history", json={**ENTRY, "content_md": "# Edited text", "style": "classic"}).json()["id"]
     assert signed_in.get(f"/api/history/{entry_id}/pdf").content == b"%PDF-fake"
     assert calls == [("# Edited text", "classic")]
+
+
+def test_clear_history_deletes_all_entries(signed_in):
+    for company in ["First", "Second"]:
+        signed_in.post("/api/history", json={**ENTRY, "company": company})
+    entry_id = signed_in.get("/api/history").json()[0]["id"]
+    assert signed_in.delete("/api/history").status_code == 204
+    assert signed_in.get("/api/history").json() == []
+    assert signed_in.get(f"/api/history/{entry_id}/pdf").status_code == 404
+    conn = db.connect()
+    assert conn.execute("SELECT COUNT(*) FROM custom_resumes").fetchone()[0] == 0
+    conn.close()
+
+
+def test_clear_empty_history(signed_in):
+    assert signed_in.delete("/api/history").status_code == 204
