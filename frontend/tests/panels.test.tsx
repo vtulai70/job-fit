@@ -140,3 +140,24 @@ test("choosing a model saves it", async () => {
   await userEvent.selectOptions(screen.getByLabelText("AI model"), "anthropic/claude-sonnet-5.5");
   expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, model: "anthropic/claude-sonnet-5.5" });
 });
+
+test("preferences are grouped: resume generation first, PDF last", () => {
+  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  const legends = screen.getAllByRole("group").map((group) => group.querySelector("legend")!.textContent);
+  expect(legends).toEqual(["Resume generation", "PDF"]);
+  const generation = screen.getByRole("group", { name: "Resume generation" });
+  for (const label of [
+    "AI model",
+    "Professional Experience (years)",
+    "Earlier Experience (years)",
+    "Max pages",
+    "Tone",
+    "Notes for the AI",
+  ]) {
+    expect(within(generation).getByLabelText(label)).toBeInTheDocument();
+  }
+  expect(within(generation).getByRole("checkbox", { name: "Include phone number in generated resume" })).toBeInTheDocument();
+  const pdf = screen.getByRole("group", { name: "PDF" });
+  expect(within(pdf).getByLabelText("PDF style")).toBeInTheDocument();
+  expect(within(pdf).queryByLabelText("AI model")).not.toBeInTheDocument();
+});
