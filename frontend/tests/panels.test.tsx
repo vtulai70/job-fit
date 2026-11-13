@@ -205,3 +205,19 @@ test("preferences are grouped: resume generation first, PDF last", () => {
   expect(within(pdf).getByLabelText("PDF style")).toBeInTheDocument();
   expect(within(pdf).queryByLabelText("AI model")).not.toBeInTheDocument();
 });
+
+function entries(count: number) {
+  return Array.from({ length: count }, (_, i) => ({ ...ENTRY, id: i + 1, company: `Co ${i + 1}` }));
+}
+
+test("history list is capped at the 10th row only when there are more than 10 entries", () => {
+  vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(333);
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(37);
+  const { rerender } = render(<HistoryPanel entries={entries(10)} onClear={vi.fn()} />);
+  expect(screen.getByRole("list").style.maxHeight).toBe("");
+  rerender(<HistoryPanel entries={entries(11)} onClear={vi.fn()} />);
+  expect(screen.getByRole("list").style.maxHeight).toBe("370px");
+  expect(screen.getAllByRole("listitem")).toHaveLength(11);
+  rerender(<HistoryPanel entries={entries(3)} onClear={vi.fn()} />);
+  expect(screen.getByRole("list").style.maxHeight).toBe("");
+});

@@ -110,3 +110,38 @@ test("clear history asks first, then deletes every entry", async ({ page }) => {
   await page.reload();
   await expect(history.getByText("No downloads yet.")).toBeVisible();
 });
+
+test("history shows at most 10 entries and scrolls for more", async ({ page }) => {
+  await signIn(page);
+  expect((await page.request.delete("/api/history")).status()).toBe(204);
+  const entry = { job_description: "j", content_md: "# Me", style: "modern", model: "openai/gpt-oss-120b" };
+  const add = async (n: number) =>
+    expect((await page.request.post("/api/history", { data: { ...entry, company: `Scroll Co ${n}` } })).status()).toBe(201);
+  for (let n = 1; n <= 10; n++) await add(n);
+
+  await page.reload();
+  const list = page.getByRole("region", { name: "Download history" }).getByRole("list");
+  await expect(list.getByRole("listitem")).toHaveCount(10);
+  const overflow = () => list.evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(await overflow()).toBe(0);
+
+  await add(11);
+  await add(12);
+  await page.reload();
+  const rows = list.getByRole("listitem");
+  await expect(rows).toHaveCount(12);
+  expect(await overflow()).toBeGreaterThan(0);
+  expect(await list.evaluate((el) => getComputedStyle(el).overflowY)).toBe("auto");
+  const box = (await list.boundingBox())!;
+  const bottom = async (i: number) => {
+    const row = (await rows.nth(i).boundingBox())!;
+    return row.y + row.height;
+  };
+  expect(await bottom(9)).toBeLessThanOrEqual(box.y + box.height + 1);
+  expect((await rows.nth(10).boundingBox())!.y).toBeGreaterThanOrEqual(box.y + box.height - 1);
+
+  await list.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  const last = (await rows.nth(11).boundingBox())!;
+  expect(last.y).toBeGreaterThanOrEqual(box.y - 1);
+  expect(last.y + last.height).toBeLessThanOrEqual(box.y + box.height + 1);
+});

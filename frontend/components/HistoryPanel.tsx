@@ -1,12 +1,28 @@
+"use client";
+
+import { useLayoutEffect, useRef } from "react";
+
 import { type HistoryEntry, pdfUrl } from "@/lib/api";
 
 type Props = { entries: HistoryEntry[]; onClear: () => void };
 
 export const CLEAR_CONFIRM = "Delete all download history? This cannot be undone.";
 
+/** Rows shown before the list scrolls. */
+export const MAX_VISIBLE = 10;
+
 /** Past downloads, newest first: company, time, generating model (when recorded) and a re-download link.
- * "Clear history" asks for confirmation, then calls onClear. */
+ * "Clear history" asks for confirmation, then calls onClear. The list is as tall as its first
+ * MAX_VISIBLE rows (measured, since rows can wrap) and scrolls beyond that. */
 export default function HistoryPanel({ entries, onClear }: Props) {
+  const list = useRef<HTMLUListElement>(null);
+
+  useLayoutEffect(() => {
+    if (!list.current) return;
+    const last = list.current.children[MAX_VISIBLE - 1] as HTMLElement | undefined;
+    list.current.style.maxHeight = last && entries.length > MAX_VISIBLE ? `${last.offsetTop + last.offsetHeight}px` : "";
+  }, [entries]);
+
   return (
     <section aria-labelledby="history-heading" className="rounded-lg border border-line bg-surface p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -25,7 +41,7 @@ export default function HistoryPanel({ entries, onClear }: Props) {
       {entries.length === 0 ? (
         <p className="text-sm text-ink/60">No downloads yet.</p>
       ) : (
-        <ul className="divide-y divide-line text-sm">
+        <ul ref={list} className="relative divide-y divide-line overflow-y-auto text-sm">
           {entries.map((entry) => (
             <li key={entry.id} className="flex items-center justify-between py-2">
               <span>
