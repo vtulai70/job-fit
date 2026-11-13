@@ -15,7 +15,7 @@ def test_database_created_on_startup(client):
     assert tables(db.DB_PATH) == {"users", "baseline_resumes", "custom_resumes", "preferences"}
 
 
-def test_init_adds_model_column_to_an_older_history_table(tmp_path, monkeypatch):
+def test_init_adds_newer_columns_to_an_older_history_table(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "old.db")
     conn = sqlite3.connect(db.DB_PATH)
     conn.executescript(
@@ -29,7 +29,7 @@ def test_init_adds_model_column_to_an_older_history_table(tmp_path, monkeypatch)
     db.init_db()
     db.init_db()
     conn = sqlite3.connect(db.DB_PATH)
-    assert conn.execute("SELECT company, model FROM custom_resumes").fetchall() == [("Acme", None)]
+    assert conn.execute("SELECT company, model, optimization FROM custom_resumes").fetchall() == [("Acme", None, None)]
     conn.close()
 
 

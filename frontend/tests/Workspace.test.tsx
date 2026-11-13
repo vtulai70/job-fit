@@ -17,9 +17,10 @@ const PREFS: Preferences = {
   professional_years: 15,
   earlier_years: 10,
   model: "openai/gpt-oss-120b",
+  optimization: "smart",
 };
 const HISTORY = [
-  { id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-oss-120b" },
+  { id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-oss-120b", optimization: "full" },
 ];
 
 function mockData(baseline: string | null = "# Saved resume") {
@@ -88,12 +89,14 @@ const RESUME_RESULT = {
   company: "Initech",
   resume_md: "# Tailored for Initech",
   model: "openai/gpt-oss-120b",
+  optimization: "smart",
 };
 const QUESTION_RESULT = {
   reply: "Which team size should I emphasize?",
   company: "Initech",
   resume_md: null,
   model: "openai/gpt-oss-120b",
+  optimization: "smart",
 };
 
 function mockChat(...results: { status?: number; body?: unknown }[]) {
@@ -179,7 +182,7 @@ test("a failed generate shows an error message in the chat", async () => {
   expect(screen.getByRole("button", { name: "Generate custom resume" })).toBeEnabled();
 });
 
-test("downloading the generated resume records history with company, job, style and model", async () => {
+test("downloading the generated resume records history with company, job, style, model and optimization", async () => {
   const fetchMock = mockChat({ body: RESUME_RESULT });
   const base = fetchMock.getMockImplementation()!;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
@@ -189,7 +192,7 @@ test("downloading the generated resume records history with company, job, style 
           company: "Initech",
           style: "modern",
           downloaded_at: "2026-11-11T12:00:00Z",
-          model: "openai/gpt-oss-120b",
+          model: "openai/gpt-oss-120b", optimization: "full",
         })
       : base(url, init),
   );
@@ -207,8 +210,27 @@ test("downloading the generated resume records history with company, job, style 
     content_md: "# Tailored for Initech",
     style: "modern",
     model: "openai/gpt-oss-120b",
+    optimization: "smart",
   });
   expect(screen.getByRole("link", { name: "Download Initech resume" })).toBeInTheDocument();
+});
+
+test("download records the optimization level that generated the resume, not one chosen afterwards", async () => {
+  const fetchMock = mockChat({ body: { ...RESUME_RESULT, optimization: "full" } });
+  mockHistoryPost(fetchMock);
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await screen.findByLabelText("Custom resume content");
+  await userEvent.selectOptions(screen.getByLabelText("Optimization level"), "light");
+  await userEvent.click(screen.getByRole("button", { name: "Download PDF" }));
+  await vi.waitFor(() => expect(postedHistory(fetchMock).optimization).toBe("full"));
+});
+
+test("changing the optimization level saves it", async () => {
+  const fetchMock = mockData();
+  render(<Workspace />);
+  await userEvent.selectOptions(await screen.findByLabelText("Optimization level"), "full");
+  await waitFor(() => expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, optimization: "full" }));
 });
 
 test("download records the model that generated the resume, not a model chosen afterwards", async () => {
@@ -315,12 +337,14 @@ function chatLines() {
   return [...screen.getByRole("log", { name: "Conversation" }).children].map((el) => el.textContent);
 }
 
-const DEFAULT_NOTE = "Model: openai/gpt-oss-120b\nProfessional Experience: 15 years\nEarlier Experience: 10 years\nTone: concise";
+const DEFAULT_NOTE = "Model: openai/gpt-oss-120b\nOptimization level: Smart integration\nProfessional Experience: 15 years\nEarlier Experience: 10 years\nTone: concise";
 
 test("settings note lists model, experience years and tone; notes only when set", () => {
   expect(settingsNote(PREFS)).toBe(DEFAULT_NOTE);
+  expect(settingsNote({ ...PREFS, optimization: "light" })).toContain("\nOptimization level: Light polish\n");
+  expect(settingsNote({ ...PREFS, optimization: "full" }).split("\n")[1]).toBe("Optimization level: Full tailoring");
   expect(settingsNote({ ...PREFS, tone: "  ", notes: " Lead with AI ", earlier_years: 0 })).toBe(
-    "Model: openai/gpt-oss-120b\nProfessional Experience: 15 years\nEarlier Experience: 0 years\nTone: no preference\nNotes: Lead with AI",
+    "Model: openai/gpt-oss-120b\nOptimization level: Smart integration\nProfessional Experience: 15 years\nEarlier Experience: 0 years\nTone: no preference\nNotes: Lead with AI",
   );
 });
 
@@ -369,6 +393,7 @@ test("after changing settings the next generate's note shows them", async () => 
   );
   await ready();
   await userEvent.selectOptions(screen.getByLabelText("AI model"), "openai/gpt-5.4-nano");
+  await userEvent.selectOptions(screen.getByLabelText("Optimization level"), "full");
   await userEvent.clear(screen.getByLabelText("Professional Experience (years)"));
   await userEvent.type(screen.getByLabelText("Professional Experience (years)"), "8");
   await userEvent.clear(screen.getByLabelText("Tone"));
@@ -376,7 +401,7 @@ test("after changing settings the next generate's note shows them", async () => 
   await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
   await screen.findByText("Here is your resume.");
   expect(chatLines()[0]).toBe(
-    "Model: openai/gpt-5.4-nano\nProfessional Experience: 8 years\nEarlier Experience: 10 years\nTone: no preference\nNotes: Stress mentoring",
+    "Model: openai/gpt-5.4-nano\nOptimization level: Full tailoring\nProfessional Experience: 8 years\nEarlier Experience: 10 years\nTone: no preference\nNotes: Stress mentoring",
   );
 });
 

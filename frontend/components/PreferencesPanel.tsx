@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { MODELS, type Model, type Preferences, type Style } from "@/lib/api";
+import { MODELS, type Model, OPTIMIZATION_LEVELS, type Optimization, type Preferences, type Style } from "@/lib/api";
 
 import PanelTitle from "./PanelTitle";
 
@@ -48,6 +48,24 @@ export default function PreferencesPanel({ initial, onChange }: Props) {
                 ))}
               </select>
             </label>
+            <label className="text-sm">
+              Optimization level
+              <select
+                value={prefs.optimization}
+                onChange={(e) => update({ optimization: e.target.value as Optimization })}
+                aria-describedby="optimization-description"
+                className={inputClass}
+              >
+                {OPTIMIZATION_LEVELS.map((level) => (
+                  <option key={level.value} value={level.value}>
+                    {level.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p id="optimization-description" className="-mt-1 text-xs text-ink/60">
+              {OPTIMIZATION_LEVELS.find((level) => level.value === prefs.optimization)!.description}
+            </p>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <label>
                 Professional Experience (years)

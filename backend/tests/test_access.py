@@ -9,7 +9,7 @@ PROTECTED = [
     ("GET", "/api/resume/baseline", None),
     ("PUT", "/api/resume/baseline", {"content_md": "x"}),
     ("GET", "/api/history", None),
-    ("POST", "/api/history", {"company": "A", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b"}),
+    ("POST", "/api/history", {"company": "A", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b", "optimization": "smart"}),
     ("GET", "/api/history/1/pdf", None),
     ("DELETE", "/api/history", None),
     ("GET", "/api/preferences", None),
@@ -36,7 +36,7 @@ def two_users(client):
     client.put("/api/preferences", json={"style": "classic"})
     entry_id = client.post(
         "/api/history",
-        json={"company": "Acme", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b"},
+        json={"company": "Acme", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b", "optimization": "smart"},
     ).json()["id"]
     act_as("user_bob")
     yield client, entry_id
@@ -70,7 +70,7 @@ def test_clearing_history_leaves_other_users_entries(two_users):
     client, entry_id = two_users
     client.post(
         "/api/history",
-        json={"company": "Bob Co", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b"},
+        json={"company": "Bob Co", "job_description": "j", "content_md": "c", "style": "modern", "model": "openai/gpt-oss-120b", "optimization": "smart"},
     )
     assert client.delete("/api/history").status_code == 204
     assert client.get("/api/history").json() == []

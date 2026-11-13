@@ -63,6 +63,8 @@ test("preferences persist across reload", async ({ page }) => {
   await page.getByLabel("PDF style").selectOption("classic");
   await page.getByLabel("Tone").fill("concise, metrics-driven");
   await page.getByLabel("Notes for the AI").fill("Emphasize AI adoption");
+  await expect(page.getByLabel("Optimization level")).toHaveValue("smart");
+  await page.getByLabel("Optimization level").selectOption("full");
   const phone = page.getByRole("checkbox", { name: "Include phone number in generated resume" });
   await expect(phone).toBeChecked();
   await phone.uncheck();
@@ -89,6 +91,7 @@ test("preferences persist across reload", async ({ page }) => {
   await expect(page.getByLabel("Professional Experience (years)")).toHaveValue("12");
   await expect(page.getByLabel("Earlier Experience (years)")).toHaveValue("6");
   await expect(page.getByLabel("AI model")).toHaveValue("anthropic/claude-sonnet-5.5");
+  await expect(page.getByLabel("Optimization level")).toHaveValue("full");
 });
 
 test("history entry is listed and re-downloads as PDF", async ({ page }) => {
@@ -100,6 +103,7 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
       content_md: await readFile(RESUME, "utf-8"),
       style: "modern",
       model: "openai/gpt-6-sol",
+      optimization: "light",
     },
   });
   expect(response.status()).toBe(201);
@@ -107,7 +111,9 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
   await page.reload();
   const history = page.getByRole("region", { name: "Download history" });
   await expect(history.getByText("Globex Corporation")).toBeVisible();
-  await expect(history.getByRole("listitem").filter({ hasText: "Globex Corporation" })).toContainText("openai/gpt-6-sol");
+  const globex = history.getByRole("listitem").filter({ hasText: "Globex Corporation" });
+  await expect(globex).toContainText("openai/gpt-6-sol");
+  await expect(globex).toContainText("Light polish");
 
   const downloadPromise = page.waitForEvent("download");
   await history.getByRole("link", { name: "Download Globex Corporation resume" }).click();
@@ -119,7 +125,7 @@ test("history entry is listed and re-downloads as PDF", async ({ page }) => {
 
 test("clear history asks first, then deletes every entry", async ({ page }) => {
   await signIn(page);
-  const entry = { job_description: "j", content_md: "# Me", style: "modern", model: "openai/gpt-oss-120b" };
+  const entry = { job_description: "j", content_md: "# Me", style: "modern", model: "openai/gpt-oss-120b", optimization: "smart" };
   for (const company of ["Clear Co One", "Clear Co Two"]) {
     expect((await page.request.post("/api/history", { data: { ...entry, company } })).status()).toBe(201);
   }
@@ -143,7 +149,7 @@ test("clear history asks first, then deletes every entry", async ({ page }) => {
 test("history shows at most 10 entries and scrolls for more", async ({ page }) => {
   await signIn(page);
   expect((await page.request.delete("/api/history")).status()).toBe(204);
-  const entry = { job_description: "j", content_md: "# Me", style: "modern", model: "openai/gpt-oss-120b" };
+  const entry = { job_description: "j", content_md: "# Me", style: "modern", model: "openai/gpt-oss-120b", optimization: "smart" };
   const add = async (n: number) =>
     expect((await page.request.post("/api/history", { data: { ...entry, company: `Scroll Co ${n}` } })).status()).toBe(201);
   for (let n = 1; n <= 10; n++) await add(n);

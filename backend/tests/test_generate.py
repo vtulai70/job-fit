@@ -11,9 +11,9 @@ from app.main import app
 from datetime import date
 from typing import get_args
 
-from app.prompt import build_system_prompt, experience_rules
+from app.prompt import OPTIMIZATION, build_system_prompt, experience_rules
 from app.routes.generate import ChatMessage, GenerateResult, build_messages
-from app.routes.preferences import Preferences
+from app.routes.preferences import Optimization, Preferences
 
 RESUME = (Path(__file__).parents[2] / "resume.md").read_text()
 JOB = """Initech is hiring a Director of Engineering, Developer Productivity.
@@ -79,6 +79,35 @@ def test_system_prompt_keeps_graduation_year_when_requested():
     prompt = build_system_prompt("# Me", "Job", Preferences(include_graduation_year=True), 2026)
     assert "Graduation year: keep the graduation or completion year" in prompt
     assert "do NOT include any year in the Education section" not in prompt
+
+
+def test_system_prompt_uses_smart_integration_by_default():
+    prompt = build_system_prompt("# Me", "Job", Preferences(), 2026)
+    assert f"Optimization level: {OPTIMIZATION['smart']}" in prompt
+    assert "Change the resume only as much as the user's optimization level below says" in prompt
+
+
+@pytest.mark.parametrize("level", ["light", "smart", "full"])
+def test_system_prompt_has_only_the_chosen_optimization_level(level):
+    prompt = build_system_prompt("# Me", "Job", Preferences(optimization=level), 2026)
+    assert f"Optimization level: {OPTIMIZATION[level]}" in prompt
+    for other in set(OPTIMIZATION) - {level}:
+        assert OPTIMIZATION[other] not in prompt
+
+
+def test_optimization_levels_match_frontend_list_and_have_prompt_text():
+    """Keep in sync with OPTIMIZATION_LEVELS in frontend/lib/api.ts."""
+    assert get_args(Optimization) == ("light", "smart", "full")
+    assert tuple(OPTIMIZATION) == get_args(Optimization)
+
+
+def test_optimization_levels_match_their_names():
+    assert OPTIMIZATION["light"].startswith("Light polish.")
+    assert "original context intact" in OPTIMIZATION["light"]
+    assert OPTIMIZATION["smart"].startswith("Smart integration.")
+    assert "integrate" in OPTIMIZATION["smart"]
+    assert OPTIMIZATION["full"].startswith("Full tailoring.")
+    assert "rewrite and reprioritize" in OPTIMIZATION["full"]
 
 
 def test_experience_rules_default_windows():
@@ -174,7 +203,7 @@ def test_generate_uses_stored_baseline_preferences_and_history(signed_in, use_ai
     assert response.status_code == 200
     assert response.json() == {
         "reply": "Done", "company": "Initech", "experience_plan": [], "resume_md": "# Tailored",
-        "model": "openai/gpt-oss-120b",
+        "model": "openai/gpt-oss-120b", "optimization": "smart",
     }
     messages = sent_messages(client)
     system = messages[0]["content"]
@@ -206,6 +235,15 @@ def test_generate_names_and_uses_the_saved_model(signed_in, use_ai):
     response = signed_in.post("/api/generate", json={"job_description": "x", "message": "go"})
     assert response.json()["model"] == "anthropic/claude-haiku-5.5"
     assert client.chat.completions.parse.call_args.kwargs["model"] == "anthropic/claude-haiku-5.5"
+
+
+@pytest.mark.parametrize("level", ["light", "full"])
+def test_generate_sends_and_names_the_stored_optimization_level(signed_in, use_ai, level):
+    signed_in.put("/api/preferences", json={"optimization": level})
+    client = use_ai(RESUME_RESULT)
+    response = signed_in.post("/api/generate", json={"job_description": "x", "message": "go"})
+    assert response.json()["optimization"] == level
+    assert f"Optimization level: {OPTIMIZATION[level]}" in sent_messages(client)[0]["content"]
 
 
 def test_generate_sends_experience_windows_for_this_year(signed_in, use_ai):
@@ -286,6 +324,35 @@ def test_real_generation_keeps_graduation_year_when_requested():
     result = ai.ask_structured(ai.get_client(), build_messages(system, [], message), GenerateResult)
     assert result.resume_md
     assert "1995" in education_section(result.resume_md)
+
+
+def core_bullets() -> list[str]:
+    """Bullets of the two 2019-2026 baseline roles, which always land in Professional Experience."""
+    history = RESUME.split("## Professional History")[1].split("## Education")[0]
+    return re.findall(r"^- (.+)$", "".join(history.split("\n### ")[1:3]), re.M)
+
+
+def same_text(text: str) -> str:
+    """Text compared regardless of hyphen/dash variants (models swap in non-breaking hyphens) and spacing."""
+    return " ".join(re.sub(r"[\u2010-\u2015\u2212-]", "-", text).split())
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("level", ["light", "smart", "full"])
+def test_real_generation_follows_optimization_level(level):
+    system = build_system_prompt(RESUME, JOB, Preferences(optimization=level), 2026)
+    message = "Generate my custom resume now. Do not ask questions."
+    result = ai.ask_structured(ai.get_client(), build_messages(system, [], message), GenerateResult)
+    assert result.resume_md
+    assert result.company and "initech" in result.company.lower()
+    assert "Azure" not in result.resume_md
+    assert "vtulai@yahoo.com" in result.resume_md
+    assert not re.search(r"(19|20)\d\d", education_section(result.resume_md))
+    kept = sum(same_text(b) in same_text(result.resume_md) for b in core_bullets())
+    if level == "light":
+        assert kept == len(core_bullets())
+    else:
+        assert kept < len(core_bullets())
 
 
 def section(md: str, title: str) -> str:

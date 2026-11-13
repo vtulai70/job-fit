@@ -19,12 +19,15 @@ Tailor the user's baseline resume to the target job description to maximize the 
 3. If something important is unclear (e.g. which experience to emphasize), ask one or two short
    clarifying questions instead of generating. Do not ask more than once per conversation unless the
    user asks you to.
-4. Otherwise generate the custom resume: match the company vibe, weave in the top keywords, and
-   surface relevant competencies that are implied but not explicit in the professional history.
+4. Otherwise generate the custom resume at the user's optimization level (below): match the company
+   vibe, weave in the top keywords, and surface relevant competencies that are implied but not
+   explicit in the professional history, but only in the parts of the resume that level lets you change.
 
 # Rules
 
 - Show or hide years in the Education section exactly as the user preferences below say.
+- Change the resume only as much as the user's optimization level below says. Every level follows
+  all of these rules: tailoring never adds facts that are not in the baseline resume.
 - Do not add technologies, tools or programming languages that are not in the baseline resume, even
   ones commonly used alongside them. Every tool you list must appear in the baseline. If the job asks
   for one that is missing (e.g. Azure), emphasize the closest one the user has (e.g. AWS) and do not
@@ -59,6 +62,24 @@ GRADUATION_EXCLUDE = (
     "do NOT include any year in the Education section (graduation or completion). For example, "
     '"M.Sc. - Some University (Completed 1995)" becomes "M.Sc. - Some University"'
 )
+
+
+OPTIMIZATION = {
+    "light": (
+        "Light polish. Add the job's key skills and requirements that the baseline supports to the summary "
+        "and skills sections only, and keep the original context intact: copy every work history bullet "
+        "word for word from the baseline, in its original order. Do not rephrase, merge or reorder them."
+    ),
+    "smart": (
+        "Smart integration. Naturally integrate the job's key skills and requirements into the work history, "
+        "rephrasing existing bullets where the baseline supports it, to make a stronger impression. Keep the "
+        "original structure and the order of roles."
+    ),
+    "full": (
+        "Full tailoring. Fully rewrite and reprioritize the content (summary, skills, and the wording and order "
+        "of bullets within each role) to match exactly what the employer is looking for."
+    ),
+}
 
 
 def experience_rules(prefs: Preferences, year: int) -> str:
@@ -103,6 +124,7 @@ def build_system_prompt(baseline: str | None, job_description: str, prefs: Prefe
 - Notes: {prefs.notes or "none"}
 - Phone number: {PHONE_INCLUDE if prefs.include_phone else PHONE_EXCLUDE}
 - Graduation year: {GRADUATION_INCLUDE if prefs.include_graduation_year else GRADUATION_EXCLUDE}
+- Optimization level: {OPTIMIZATION[prefs.optimization]}
 - Experience (the current year is {year}; place each role by its end year):
 {experience_rules(prefs, year)}
 

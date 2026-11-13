@@ -9,15 +9,16 @@ import { showBaseline, signIn } from "./helpers";
 const RESUME = path.join(__dirname, "..", "..", "resume.md");
 const TAILORED = "# Voicu Tulai\n\n## Professional Summary\n\nEngineering leader for Umbrella Corp.";
 
-/** The model the mocked /api/generate says it used (the real route returns the saved model). */
+/** The model and level the mocked /api/generate says it used (the real route returns the saved ones). */
 const GENERATED_BY = "anthropic/claude-haiku-5.5";
+const GENERATED_WITH = "full";
 
 /** Answer /api/generate with the given replies in order, recording request bodies. */
 async function mockGenerate(page: Page, replies: object[]) {
   const bodies: Record<string, unknown>[] = [];
   await page.route("**/api/generate", async (route) => {
     bodies.push(route.request().postDataJSON());
-    await route.fulfill({ json: { model: GENERATED_BY, ...replies.shift() } });
+    await route.fulfill({ json: { model: GENERATED_BY, optimization: GENERATED_WITH, ...replies.shift() } });
   });
   return bodies;
 }
@@ -55,9 +56,11 @@ test("generate, download PDF, and see it in history", async ({ page }) => {
   const history = page.getByRole("region", { name: "Download history" });
   await expect(history.getByText("Umbrella Corp")).toBeVisible();
   await expect(history.getByText(GENERATED_BY)).toBeVisible();
+  await expect(history.getByText("Full tailoring")).toBeVisible();
   await page.reload();
   await expect(history.getByText("Umbrella Corp")).toBeVisible();
   await expect(history.getByText(GENERATED_BY)).toBeVisible();
+  await expect(history.getByText("Full tailoring")).toBeVisible();
 });
 
 test("clarifying question is answered in chat before the resume", async ({ page }) => {
@@ -87,6 +90,7 @@ test("chat shows the model and settings before each prompt it sends", async ({ p
   ]);
   await prepare(page);
   await page.getByLabel("AI model").selectOption("openai/gpt-5.4-nano");
+  await page.getByLabel("Optimization level").selectOption("light");
   await page.getByLabel("Professional Experience (years)").fill("9");
   await page.getByLabel("Earlier Experience (years)").fill("3");
   await page.getByLabel("Tone").fill("warm");
@@ -96,6 +100,7 @@ test("chat shows the model and settings before each prompt it sends", async ({ p
   const chat = page.getByRole("log", { name: "Conversation" });
   await expect(chat.getByText("Which focus?")).toBeVisible();
   await page.getByLabel("AI model").selectOption("openai/gpt-oss-120b");
+  await page.getByLabel("Optimization level").selectOption("smart");
   await page.getByLabel("Tone").fill("");
   await page.getByLabel("Notes for the AI").fill("Stress mentoring");
   await page.getByLabel("Message").fill("Platform");
@@ -103,16 +108,17 @@ test("chat shows the model and settings before each prompt it sends", async ({ p
   await expect(chat.getByText("Done.")).toBeVisible();
 
   await expect(chat.locator(":scope > *")).toHaveText([
-    "Model: openai/gpt-5.4-nano\nProfessional Experience: 9 years\nEarlier Experience: 3 years\nTone: warm",
+    "Model: openai/gpt-5.4-nano\nOptimization level: Light polish\nProfessional Experience: 9 years\nEarlier Experience: 3 years\nTone: warm",
     "You: Please generate my custom resume for this job description.",
     "AI: Which focus?",
-    "Model: openai/gpt-oss-120b\nProfessional Experience: 9 years\nEarlier Experience: 3 years\nTone: no preference\nNotes: Stress mentoring",
+    "Model: openai/gpt-oss-120b\nOptimization level: Smart integration\nProfessional Experience: 9 years\nEarlier Experience: 3 years\nTone: no preference\nNotes: Stress mentoring",
     "You: Platform",
     "AI: Done.",
   ]);
   const firstNote = await chat.locator(":scope > *").first().evaluate((el) => (el as HTMLElement).innerText);
   expect(firstNote.split("\n")).toEqual([
     "Model: openai/gpt-5.4-nano",
+    "Optimization level: Light polish",
     "Professional Experience: 9 years",
     "Earlier Experience: 3 years",
     "Tone: warm",

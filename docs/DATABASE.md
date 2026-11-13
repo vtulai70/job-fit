@@ -6,7 +6,7 @@ The full schema is in `docs/schema.json`. This document explains the approach.
 
 - SQLite file at `data/jobfit.db`. In Docker, `data/` is the host-mounted volume, so data survives container restarts.
 - Access through Python's stdlib `sqlite3`. No ORM: four small tables and simple queries do not need one.
-- On startup the backend creates the `data/` directory and the tables if missing (`CREATE TABLE IF NOT EXISTS`). A user row is created on each Clerk user's first request. No migration tool for the MVP; the one column added later (`custom_resumes.model`) is added by `init_db` with `ALTER TABLE` when missing.
+- On startup the backend creates the `data/` directory and the tables if missing (`CREATE TABLE IF NOT EXISTS`). A user row is created on each Clerk user's first request. No migration tool for the MVP; columns added later (`custom_resumes.model`, `custom_resumes.optimization`) are added by `init_db` with `ALTER TABLE` when missing.
 - One connection per request (FastAPI dependency), with `PRAGMA foreign_keys = ON` and `row_factory = sqlite3.Row`.
 - Timestamps are ISO-8601 UTC text.
 - Every query is filtered by the current user's `id`, so the schema is multi-user ready from day one.
@@ -17,7 +17,7 @@ The full schema is in `docs/schema.json`. This document explains the approach.
 |---|---|---|
 | `users` | Accounts; `username` holds the Clerk user id (e.g. `user_2abc...`) | 1 |
 | `baseline_resumes` | Current baseline resume as markdown; upload replaces it | 0..1 |
-| `custom_resumes` | Download history: company, job description, generated markdown, PDF style, timestamp, generating model | 0..n |
+| `custom_resumes` | Download history: company, job description, generated markdown, PDF style, timestamp, generating model and optimization level | 0..n |
 | `preferences` | JSON object of preferences; no row means defaults | 0..1 |
 
 ## SQL
@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS custom_resumes (
     content_md      TEXT NOT NULL,
     style           TEXT NOT NULL,
     downloaded_at   TEXT NOT NULL,
-    model           TEXT            -- model that generated the resume; NULL for rows saved before it was recorded
+    model           TEXT,           -- model that generated the resume; NULL for rows saved before it was recorded
+    optimization    TEXT            -- optimization level (light/smart/full) used; NULL for rows saved before it was recorded
 );
 CREATE INDEX IF NOT EXISTS idx_custom_resumes_user_downloaded
     ON custom_resumes (user_id, downloaded_at);
@@ -60,7 +61,7 @@ CREATE TABLE IF NOT EXISTS preferences (
 ```json
 { "style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": true,
   "include_graduation_year": false,
-  "professional_years": 15, "earlier_years": 10, "model": "openai/gpt-oss-120b" }
+  "professional_years": 15, "earlier_years": 10, "model": "openai/gpt-oss-120b", "optimization": "smart" }
 ```
 
 - `style`: PDF visual style, one of `professional`, `modern`, `classic`
@@ -71,6 +72,7 @@ CREATE TABLE IF NOT EXISTS preferences (
 - `include_graduation_year`: whether the generated resume keeps the university graduation/completion year in Education (default `false`; older rows load as `false`)
 - `professional_years` (1-50, default 15) and `earlier_years` (0-50, default 10): experience windows, see `backend/CLAUDE.md`. Older rows load with the defaults
 - `model`: OpenRouter model id used for generation, one of the list in `backend/app/ai.py` (`Model`); default `openai/gpt-oss-120b`, older rows load with the default
+- `optimization`: how much the AI changes the resume, one of `light` (Light polish), `smart` (Smart integration), `full` (Full tailoring); default `smart`, older rows load with the default
 
 Stored as JSON so new preference keys need no schema change. The backend validates it with a Pydantic model.
 

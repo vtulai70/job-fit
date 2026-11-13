@@ -53,6 +53,7 @@ test("job description reports typed text", async () => {
 });
 
 const MODEL = "openai/gpt-oss-120b" as const;
+const OPTIMIZATION = "smart" as const;
 const PREVIEW = { style: "modern" as const, renderPreview: vi.fn() };
 
 test("custom resume shows placeholder and no download when empty", () => {
@@ -65,7 +66,7 @@ test("custom resume shows placeholder and no download when empty", () => {
 
 test("custom resume shows editable content and downloads", async () => {
   const onDownload = vi.fn();
-  render(<CustomResume {...PREVIEW} resume={{ company: "Acme", content_md: "# Tailored", model: MODEL }} onChange={vi.fn()} onDownload={onDownload} />);
+  render(<CustomResume {...PREVIEW} resume={{ company: "Acme", content_md: "# Tailored", model: MODEL, optimization: OPTIMIZATION }} onChange={vi.fn()} onDownload={onDownload} />);
   expect(screen.getByRole("heading", { name: "Custom resume for Acme" })).toBeInTheDocument();
   const editor = screen.getByRole("textbox", { name: "Custom resume content" });
   expect(editor).toHaveValue("# Tailored");
@@ -76,13 +77,13 @@ test("custom resume shows editable content and downloads", async () => {
 
 test("editing the custom resume reports the new text", async () => {
   const onChange = vi.fn();
-  render(<CustomResume {...PREVIEW} resume={{ company: "Acme", content_md: "# Tailored", model: MODEL }} onChange={onChange} onDownload={vi.fn()} />);
+  render(<CustomResume {...PREVIEW} resume={{ company: "Acme", content_md: "# Tailored", model: MODEL, optimization: OPTIMIZATION }} onChange={onChange} onDownload={vi.fn()} />);
   await userEvent.type(screen.getByLabelText("Custom resume content"), "!");
   expect(onChange).toHaveBeenCalledWith("# Tailored!");
 });
 
 test("download is disabled when the edited resume is empty", () => {
-  render(<CustomResume {...PREVIEW} resume={{ company: "Acme", content_md: "  \n ", model: MODEL }} onChange={vi.fn()} onDownload={vi.fn()} />);
+  render(<CustomResume {...PREVIEW} resume={{ company: "Acme", content_md: "  \n ", model: MODEL, optimization: OPTIMIZATION }} onChange={vi.fn()} onDownload={vi.fn()} />);
   expect(screen.getByRole("button", { name: "Download PDF" })).toBeDisabled();
 });
 
@@ -91,7 +92,7 @@ function previewTitle() {
 }
 
 test("custom resume starts in Markdown mode", () => {
-  render(<CustomResume {...PREVIEW} resume={{ company: "Acme", content_md: "# Tailored", model: MODEL }} onChange={vi.fn()} onDownload={vi.fn()} />);
+  render(<CustomResume {...PREVIEW} resume={{ company: "Acme", content_md: "# Tailored", model: MODEL, optimization: OPTIMIZATION }} onChange={vi.fn()} onDownload={vi.fn()} />);
   expect(screen.getByRole("button", { name: "Markdown" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute("aria-pressed", "false");
 });
@@ -100,7 +101,7 @@ test("preview mode renders the resume in the PDF style and toggles back to the e
   const renderPreview = vi.fn().mockResolvedValue("<h1>Tailored</h1>");
   render(
     <CustomResume
-      resume={{ company: "Acme", content_md: "# Tailored", model: MODEL }}
+      resume={{ company: "Acme", content_md: "# Tailored", model: MODEL, optimization: OPTIMIZATION }}
       style="classic"
       renderPreview={renderPreview}
       onChange={vi.fn()}
@@ -124,11 +125,11 @@ test("preview mode renders the resume in the PDF style and toggles back to the e
 test("preview re-renders when the resume or style changes", async () => {
   const renderPreview = vi.fn(async (md: string, style: string) => `${style}:${md}`);
   const props = { renderPreview, onChange: vi.fn(), onDownload: vi.fn() };
-  const { rerender } = render(<CustomResume {...props} style="modern" resume={{ company: "A", content_md: "# One", model: MODEL }} />);
+  const { rerender } = render(<CustomResume {...props} style="modern" resume={{ company: "A", content_md: "# One", model: MODEL, optimization: OPTIMIZATION }} />);
   await userEvent.click(screen.getByRole("button", { name: "Preview" }));
   await vi.waitFor(() => expect(previewTitle()).toHaveAttribute("srcdoc", "modern:# One"));
-  rerender(<CustomResume {...props} style="modern" resume={{ company: "A", content_md: "# Two", model: MODEL }} />);
+  rerender(<CustomResume {...props} style="modern" resume={{ company: "A", content_md: "# Two", model: MODEL, optimization: OPTIMIZATION }} />);
   await vi.waitFor(() => expect(previewTitle()).toHaveAttribute("srcdoc", "modern:# Two"));
-  rerender(<CustomResume {...props} style="classic" resume={{ company: "A", content_md: "# Two", model: MODEL }} />);
+  rerender(<CustomResume {...props} style="classic" resume={{ company: "A", content_md: "# Two", model: MODEL, optimization: OPTIMIZATION }} />);
   await vi.waitFor(() => expect(previewTitle()).toHaveAttribute("srcdoc", "classic:# Two"));
 });

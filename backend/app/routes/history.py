@@ -10,7 +10,7 @@ from app.ai import Model
 from app.auth import UserId
 from app.db import Db, now
 from app.pdf import render_pdf
-from app.routes.preferences import Style
+from app.routes.preferences import Optimization, Style
 
 router = APIRouter(prefix="/api/history")
 
@@ -21,6 +21,7 @@ class HistoryIn(BaseModel):
     content_md: str
     style: Style
     model: Model
+    optimization: Optimization
 
 
 class HistoryEntry(BaseModel):
@@ -29,13 +30,14 @@ class HistoryEntry(BaseModel):
     style: Style
     downloaded_at: str
     model: str | None
+    optimization: str | None
 
 
 @router.get("")
 def list_history(user_id: UserId, db: Db) -> list[HistoryEntry]:
     """All downloads for the user, newest first."""
     rows = db.execute(
-        "SELECT id, company, style, downloaded_at, model FROM custom_resumes WHERE user_id = ? "
+        "SELECT id, company, style, downloaded_at, model, optimization FROM custom_resumes WHERE user_id = ? "
         "ORDER BY downloaded_at DESC, id DESC",
         (user_id,),
     ).fetchall()
@@ -48,12 +50,16 @@ def add_history(body: HistoryIn, user_id: UserId, db: Db) -> HistoryEntry:
     downloaded_at = now()
     cursor = db.execute(
         "INSERT INTO custom_resumes "
-        "(user_id, company, job_description, content_md, style, downloaded_at, model) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (user_id, body.company, body.job_description, body.content_md, body.style, downloaded_at, body.model),
+        "(user_id, company, job_description, content_md, style, downloaded_at, model, optimization) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            user_id, body.company, body.job_description, body.content_md, body.style, downloaded_at,
+            body.model, body.optimization,
+        ),
     )
     return HistoryEntry(
-        id=cursor.lastrowid, company=body.company, style=body.style, downloaded_at=downloaded_at, model=body.model
+        id=cursor.lastrowid, company=body.company, style=body.style, downloaded_at=downloaded_at,
+        model=body.model, optimization=body.optimization,
     )
 
 

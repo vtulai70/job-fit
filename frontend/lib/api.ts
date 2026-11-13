@@ -15,6 +15,30 @@ export const MODELS = [
 
 export type Model = (typeof MODELS)[number];
 
+/** How much the AI changes the resume; values match `Optimization` in the backend. */
+export const OPTIMIZATION_LEVELS = [
+  {
+    value: "light",
+    label: "Light polish",
+    description: "Adds the skills and requirements to the resume and keeps the original context intact.",
+  },
+  {
+    value: "smart",
+    label: "Smart integration",
+    description: "Naturally integrates the skills and requirements into the work history to make a stronger impression.",
+  },
+  {
+    value: "full",
+    label: "Full tailoring",
+    description: "Fully rewrites and reprioritizes the content to match exactly what the employer is looking for.",
+  },
+] as const;
+
+export type Optimization = (typeof OPTIMIZATION_LEVELS)[number]["value"];
+
+/** Display name of an optimization level, e.g. "Smart integration". */
+export const optimizationLabel = (value: Optimization) => OPTIMIZATION_LEVELS.find((l) => l.value === value)!.label;
+
 export type Preferences = {
   style: Style;
   tone: string;
@@ -25,12 +49,20 @@ export type Preferences = {
   professional_years: number;
   earlier_years: number;
   model: Model;
+  optimization: Optimization;
 };
 
 export type Baseline = { content_md: string | null; updated_at: string | null };
 
-/** `model` is null for downloads saved before the model was recorded. */
-export type HistoryEntry = { id: number; company: string; style: Style; downloaded_at: string; model: Model | null };
+/** `model` and `optimization` are null for downloads saved before they were recorded. */
+export type HistoryEntry = {
+  id: number;
+  company: string;
+  style: Style;
+  downloaded_at: string;
+  model: Model | null;
+  optimization: Optimization | null;
+};
 
 export type NewHistoryEntry = {
   company: string;
@@ -38,6 +70,7 @@ export type NewHistoryEntry = {
   content_md: string;
   style: Style;
   model: Model;
+  optimization: Optimization;
 };
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -96,6 +129,13 @@ export type ChatEntry = ChatMessage | { role: "info"; content: string };
 
 export type GenerateRequest = { job_description: string; message: string; history: ChatMessage[] };
 
-export type GenerateResult = { reply: string; company: string | null; resume_md: string | null; model: Model };
+/** `model` and `optimization` are the saved settings the backend generated with. */
+export type GenerateResult = {
+  reply: string;
+  company: string | null;
+  resume_md: string | null;
+  model: Model;
+  optimization: Optimization;
+};
 
 export const generate = (req: GenerateRequest) => request<GenerateResult>("POST", "/api/generate", req);

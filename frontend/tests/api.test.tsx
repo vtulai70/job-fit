@@ -10,6 +10,7 @@ const ENTRY = {
   content_md: "# R",
   style: "modern" as const,
   model: "openai/gpt-6-sol" as const,
+  optimization: "light" as const,
 };
 
 test("getBaseline returns the saved baseline", async () => {
@@ -65,4 +66,11 @@ test("clearHistory sends DELETE /api/history", async () => {
 test("clearHistory throws when the server fails", async () => {
   mockFetch({ "DELETE /api/history": { status: 500 } });
   await expect(api.clearHistory()).rejects.toThrow("DELETE /api/history failed: 500");
+});
+
+test("optimizationLabel names each level", () => {
+  expect(api.OPTIMIZATION_LEVELS.map((l) => l.value)).toEqual(["light", "smart", "full"]);
+  expect(api.optimizationLabel("light")).toBe("Light polish");
+  expect(api.optimizationLabel("smart")).toBe("Smart integration");
+  expect(api.optimizationLabel("full")).toBe("Full tailoring");
 });

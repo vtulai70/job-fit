@@ -6,6 +6,7 @@ ENTRY = {
     "content_md": "# Jane Doe\n\n## Experience\n\n- Led teams",
     "style": "professional",
     "model": "anthropic/claude-sonnet-5.5",
+    "optimization": "full",
 }
 
 
@@ -21,6 +22,7 @@ def test_add_entry(signed_in):
     assert body["style"] == "professional"
     assert body["downloaded_at"].endswith("Z")
     assert body["model"] == "anthropic/claude-sonnet-5.5"
+    assert body["optimization"] == "full"
     assert isinstance(body["id"], int)
 
 
@@ -36,13 +38,27 @@ def test_history_requires_a_known_model(signed_in):
     assert signed_in.post("/api/history", json={**ENTRY, "model": "acme/unknown"}).status_code == 422
 
 
-def test_entries_saved_before_the_model_column_list_without_model(signed_in):
+def test_history_lists_the_optimization_level(signed_in):
+    signed_in.post("/api/history", json=ENTRY)
+    signed_in.post("/api/history", json={**ENTRY, "optimization": "light"})
+    levels = [e["optimization"] for e in signed_in.get("/api/history").json()]
+    assert levels == ["light", "full"]
+
+
+def test_history_requires_a_known_optimization_level(signed_in):
+    without = {k: v for k, v in ENTRY.items() if k != "optimization"}
+    assert signed_in.post("/api/history", json=without).status_code == 422
+    assert signed_in.post("/api/history", json={**ENTRY, "optimization": "extreme"}).status_code == 422
+
+
+def test_entries_saved_before_the_newer_columns_list_without_them(signed_in):
     signed_in.post("/api/history", json=ENTRY)
     conn = db.connect()
     with conn:
-        conn.execute("UPDATE custom_resumes SET model = NULL")
+        conn.execute("UPDATE custom_resumes SET model = NULL, optimization = NULL")
     conn.close()
-    assert signed_in.get("/api/history").json()[0]["model"] is None
+    entry = signed_in.get("/api/history").json()[0]
+    assert (entry["model"], entry["optimization"]) == (None, None)
 
 
 def test_list_newest_first(signed_in):

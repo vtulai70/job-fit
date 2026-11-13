@@ -3,7 +3,8 @@ import pytest
 from app import db
 
 DEFAULTS = {"style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": True, "include_graduation_year": False,
-            "professional_years": 15, "earlier_years": 10, "model": "openai/gpt-oss-120b"}
+            "professional_years": 15, "earlier_years": 10, "model": "openai/gpt-oss-120b",
+            "optimization": "smart"}
 
 
 def test_defaults_when_none_saved(signed_in):
@@ -14,7 +15,8 @@ def test_defaults_when_none_saved(signed_in):
 
 def test_put_then_get(signed_in):
     prefs = {"style": "modern", "tone": "concise", "max_pages": 1, "notes": "Highlight AI work", "include_phone": False,
-             "include_graduation_year": True, "professional_years": 12, "earlier_years": 0, "model": "anthropic/claude-sonnet-5.5"}
+             "include_graduation_year": True, "professional_years": 12, "earlier_years": 0, "model": "anthropic/claude-sonnet-5.5",
+             "optimization": "light"}
     assert signed_in.put("/api/preferences", json=prefs).json() == prefs
     assert signed_in.get("/api/preferences").json() == prefs
 
@@ -97,3 +99,13 @@ def test_each_listed_model_can_be_saved(signed_in, model):
 @pytest.mark.parametrize("model", ["openai/gpt-4o", "", "anthropic/claude-opus-5-5"])
 def test_unlisted_model_rejected(signed_in, model):
     assert signed_in.put("/api/preferences", json={"model": model}).status_code == 422
+
+
+@pytest.mark.parametrize("level", ["light", "smart", "full"])
+def test_optimization_level_saved(signed_in, level):
+    signed_in.put("/api/preferences", json={"optimization": level})
+    assert signed_in.get("/api/preferences").json()["optimization"] == level
+
+
+def test_unknown_optimization_level_rejected(signed_in):
+    assert signed_in.put("/api/preferences", json={"optimization": "extreme"}).status_code == 422

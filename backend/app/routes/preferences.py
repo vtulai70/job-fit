@@ -12,6 +12,7 @@ from app.db import Db, now
 router = APIRouter(prefix="/api/preferences")
 
 Style = Literal["professional", "modern", "classic"]
+Optimization = Literal["light", "smart", "full"]
 
 
 class Preferences(BaseModel):
@@ -24,6 +25,7 @@ class Preferences(BaseModel):
     professional_years: int = Field(default=15, ge=1, le=50)
     earlier_years: int = Field(default=10, ge=0, le=50)
     model: Model = MODEL
+    optimization: Optimization = "smart"
 
 
 def load_preferences(db: Db, user_id: int) -> Preferences:

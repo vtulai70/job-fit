@@ -16,6 +16,7 @@ const PREFS: Preferences = {
   professional_years: 15,
   earlier_years: 10,
   model: "openai/gpt-oss-120b",
+  optimization: "smart",
 };
 
 test("history shows empty state", () => {
@@ -24,7 +25,7 @@ test("history shows empty state", () => {
   expect(screen.queryByRole("button", { name: "Clear history" })).not.toBeInTheDocument();
 });
 
-const ENTRY = { id: 1, company: "Acme", style: "modern" as const, downloaded_at: "2026-11-10T10:00:00Z", model: null };
+const ENTRY = { id: 1, company: "Acme", style: "modern" as const, downloaded_at: "2026-11-10T10:00:00Z", model: null, optimization: null };
 
 test("clear history asks for confirmation, then calls onClear", async () => {
   const confirm = vi.fn().mockReturnValue(true);
@@ -49,8 +50,8 @@ test("history lists entries with re-download links", () => {
     <HistoryPanel
       onClear={vi.fn()}
       entries={[
-        { id: 2, company: "Beta", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-6-sol" },
-        { id: 1, company: "Acme", style: "classic", downloaded_at: "2026-11-10T10:00:00Z", model: null },
+        { id: 2, company: "Beta", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-6-sol", optimization: "full" },
+        { id: 1, company: "Acme", style: "classic", downloaded_at: "2026-11-10T10:00:00Z", model: null, optimization: null },
       ]}
     />,
   );
@@ -59,7 +60,9 @@ test("history lists entries with re-download links", () => {
   expect(within(items[0]).getByText("Beta")).toBeInTheDocument();
   expect(within(items[0]).getByText(new Date("2026-11-11T10:00:00Z").toLocaleString())).toBeInTheDocument();
   expect(within(items[0]).getByText("openai/gpt-6-sol")).toBeInTheDocument();
+  expect(within(items[0]).getByText("Full tailoring")).toBeInTheDocument();
   expect(items[1]).not.toHaveTextContent(/openai|anthropic|google/);
+  expect(items[1]).not.toHaveTextContent(/polish|integration|tailoring/);
   expect(screen.getByRole("link", { name: "Download Beta resume" })).toHaveAttribute("href", "/api/history/2/pdf");
   expect(screen.getByRole("link", { name: "Download Acme resume" })).toHaveAttribute("href", "/api/history/1/pdf");
 });
@@ -106,6 +109,7 @@ test("every edit reports the full preferences", async () => {
     professional_years: 15,
     earlier_years: 10,
     model: "openai/gpt-oss-120b",
+    optimization: "smart",
   });
 });
 
@@ -206,6 +210,7 @@ test("preferences are grouped: resume generation first, PDF last", () => {
     "Professional Experience (years)",
     "Earlier Experience (years)",
     "Max pages",
+    "Optimization level",
     "Tone",
     "Notes for the AI",
   ]) {
@@ -255,4 +260,30 @@ test("history cap is applied when the panel is expanded again", async () => {
   await userEvent.click(toggle);
   await userEvent.click(toggle);
   expect(screen.getByRole("list").style.maxHeight).toBe("370px");
+});
+
+const LEVELS = ["Light polish", "Smart integration", "Full tailoring"];
+
+test("optimization level lists the three levels and shows the saved one with its description", () => {
+  render(<PreferencesPanel initial={{ ...PREFS, optimization: "full" }} onChange={vi.fn()} />);
+  const select = screen.getByLabelText("Optimization level");
+  expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(LEVELS);
+  expect(select).toHaveValue("full");
+  expect(select).toHaveAccessibleDescription(
+    "Fully rewrites and reprioritizes the content to match exactly what the employer is looking for.",
+  );
+});
+
+test("choosing an optimization level saves it and updates the description", async () => {
+  const onChange = vi.fn();
+  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
+  const select = screen.getByLabelText("Optimization level");
+  expect(select).toHaveAccessibleDescription(
+    "Naturally integrates the skills and requirements into the work history to make a stronger impression.",
+  );
+  await userEvent.selectOptions(select, "light");
+  expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, optimization: "light" });
+  expect(select).toHaveAccessibleDescription(
+    "Adds the skills and requirements to the resume and keeps the original context intact.",
+  );
 });

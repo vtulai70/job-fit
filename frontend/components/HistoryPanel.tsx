@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 
-import { type HistoryEntry, pdfUrl } from "@/lib/api";
+import { type HistoryEntry, optimizationLabel, pdfUrl } from "@/lib/api";
 
 import PanelTitle from "./PanelTitle";
 
@@ -13,7 +13,8 @@ export const CLEAR_CONFIRM = "Delete all download history? This cannot be undone
 /** Rows shown before the list scrolls. */
 export const MAX_VISIBLE = 10;
 
-/** Past downloads, newest first: company, time, generating model (when recorded) and a re-download link.
+/** Past downloads, newest first: company, time, generating model and optimization level (when recorded)
+ * and a re-download link.
  * "Clear history" asks for confirmation, then calls onClear. The list is as tall as its first
  * MAX_VISIBLE rows (measured, since rows can wrap) and scrolls beyond that. Starts expanded. */
 export default function HistoryPanel({ entries, onClear }: Props) {
@@ -49,6 +50,9 @@ export default function HistoryPanel({ entries, onClear }: Props) {
                 <span className="font-semibold">{entry.company}</span>
                 <span className="ml-3 text-ink/60">{new Date(entry.downloaded_at).toLocaleString()}</span>
                 {entry.model && <span className="ml-3 font-mono text-xs text-ink/60">{entry.model}</span>}
+                {entry.optimization && (
+                  <span className="ml-3 text-xs text-ink/60">{optimizationLabel(entry.optimization)}</span>
+                )}
               </span>
               <a
                 href={pdfUrl(entry.id)}
