@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { BOB, signIn } from "./helpers";
+import { BOB, showBaseline, signIn } from "./helpers";
 
 const RESUME = path.join(__dirname, "..", "..", "resume.md");
 const PHONE_DIGITS = "6047734264";
@@ -16,6 +16,7 @@ test("saved preferences shape the real generated resume", async ({ page }) => {
   test.setTimeout(180_000);
   await signIn(page, BOB);
   await page.locator('input[type="file"]').setInputFiles(RESUME);
+  await showBaseline(page);
   await expect(page.getByLabel("Baseline resume content")).toContainText("(604) 773-4264");
 
   await page.getByRole("checkbox", { name: "Include phone number in generated resume" }).uncheck();

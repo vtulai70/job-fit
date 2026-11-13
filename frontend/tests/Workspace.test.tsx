@@ -35,7 +35,11 @@ function mockData(baseline: string | null = "# Saved resume") {
 test("loads baseline, history and preferences on mount", async () => {
   mockData();
   render(<Workspace />);
-  expect(await screen.findByLabelText("Baseline resume content")).toHaveTextContent("# Saved resume");
+  const baseline = await screen.findByRole("button", { name: "Baseline resume" });
+  expect(baseline).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByLabelText("Baseline resume content")).not.toBeInTheDocument();
+  await userEvent.click(baseline);
+  expect(screen.getByLabelText("Baseline resume content")).toHaveTextContent("# Saved resume");
   expect(await screen.findByText("Acme")).toBeInTheDocument();
   expect(await screen.findByLabelText("PDF style")).toHaveValue("modern");
   expect(screen.getByLabelText("Tone")).toHaveValue("concise");
@@ -45,15 +49,19 @@ test("shows empty baseline when none saved", async () => {
   mockData(null);
   render(<Workspace />);
   await screen.findByLabelText("PDF style");
+  expect(screen.getByRole("button", { name: "Baseline resume" })).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByText("No resume uploaded yet.")).toBeInTheDocument();
 });
 
 test("uploading a resume saves it and shows the saved content", async () => {
   const fetchMock = mockData();
   const { container } = render(<Workspace />);
-  await screen.findByLabelText("Baseline resume content");
+  const baseline = await screen.findByRole("button", { name: "Baseline resume" });
   const input = container.querySelector('input[type="file"]') as HTMLInputElement;
   await userEvent.upload(input, new File(["# New resume"], "resume.md"));
+  await vi.waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true));
+  expect(baseline).toHaveAttribute("aria-expanded", "false");
+  await userEvent.click(baseline);
   await screen.findByText("# New resume");
   const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT")!;
   expect(put[0]).toBe("/api/resume/baseline");
@@ -112,14 +120,14 @@ function lastPreferencesPut(fetchMock: ReturnType<typeof mockData>) {
 
 async function ready() {
   render(<Workspace />);
-  await screen.findByLabelText("Baseline resume content");
+  await screen.findByRole("button", { name: "Baseline resume" });
   await userEvent.type(screen.getByLabelText("Job description"), "Director at Initech");
 }
 
 test("generate is disabled without a job description", async () => {
   mockData();
   render(<Workspace />);
-  await screen.findByLabelText("Baseline resume content");
+  await screen.findByRole("button", { name: "Baseline resume" });
   expect(screen.getByRole("button", { name: "Generate custom resume" })).toBeDisabled();
 });
 

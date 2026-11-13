@@ -11,9 +11,28 @@ test("resume panel shows empty state", () => {
   expect(screen.getByText("No resume uploaded yet.")).toBeInTheDocument();
 });
 
-test("resume panel shows saved content", () => {
+test("resume panel starts expanded when no baseline is saved", () => {
+  render(<ResumePanel content={null} onUpload={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Baseline resume" })).toHaveAttribute("aria-expanded", "true");
+});
+
+test("resume panel starts collapsed when a baseline is saved and expands to show it", async () => {
   render(<ResumePanel content="# Jane Doe" onUpload={vi.fn()} />);
+  const toggle = screen.getByRole("button", { name: "Baseline resume" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByLabelText("Baseline resume content")).not.toBeInTheDocument();
+  expect(screen.getByText("Upload resume")).toBeInTheDocument();
+  await userEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByLabelText("Baseline resume content")).toHaveTextContent("# Jane Doe");
+  await userEvent.click(toggle);
+  expect(screen.queryByLabelText("Baseline resume content")).not.toBeInTheDocument();
+});
+
+test("resume panel keeps its open state when a new baseline arrives", async () => {
+  const { rerender } = render(<ResumePanel content={null} onUpload={vi.fn()} />);
+  rerender(<ResumePanel content="# Uploaded" onUpload={vi.fn()} />);
+  expect(screen.getByLabelText("Baseline resume content")).toHaveTextContent("# Uploaded");
 });
 
 test("resume panel passes uploaded file text to onUpload", async () => {

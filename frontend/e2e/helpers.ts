@@ -13,6 +13,13 @@ export async function signIn(page: Page, email = ALICE) {
   await expect(page.getByRole("main")).toBeVisible();
 }
 
+/** Expand the baseline resume panel if collapsed (it starts collapsed once a baseline is saved). */
+export async function showBaseline(page: Page) {
+  const toggle = page.getByRole("button", { name: "Baseline resume" });
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+}
+
 /** Sign out and wait for the Clerk sign-in form. */
 export async function signOut(page: Page) {
   await clerk.signOut({ page });

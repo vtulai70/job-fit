@@ -4,7 +4,7 @@ import path from "node:path";
 import { setupClerkTestingToken } from "@clerk/testing/playwright";
 import { expect, test } from "@playwright/test";
 
-import { BOB, signIn, signOut } from "./helpers";
+import { BOB, showBaseline, signIn, signOut } from "./helpers";
 
 const RESUME = path.join(__dirname, "..", "..", "resume.md");
 
@@ -43,6 +43,7 @@ test("protected API rejects requests without a session", async ({ request }) => 
 test("two Clerk users do not see each other's data", async ({ page }) => {
   await signIn(page);
   await page.locator('input[type="file"]').setInputFiles(RESUME);
+  await showBaseline(page);
   await expect(page.getByLabel("Baseline resume content")).toContainText("Professional Summary");
   const created = await page.request.post("/api/history", {
     data: { company: "Alice Only Inc", job_description: "j", content_md: await readFile(RESUME, "utf-8"), style: "modern", model: "openai/gpt-oss-120b" },

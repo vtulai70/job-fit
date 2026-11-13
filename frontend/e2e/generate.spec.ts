@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { expect, type Page, test } from "@playwright/test";
 
-import { signIn } from "./helpers";
+import { showBaseline, signIn } from "./helpers";
 
 const RESUME = path.join(__dirname, "..", "..", "resume.md");
 const TAILORED = "# Voicu Tulai\n\n## Professional Summary\n\nEngineering leader for Umbrella Corp.";
@@ -25,6 +25,7 @@ async function mockGenerate(page: Page, replies: object[]) {
 async function prepare(page: Page) {
   await signIn(page);
   await page.locator('input[type="file"]').setInputFiles(RESUME);
+  await showBaseline(page);
   await expect(page.getByLabel("Baseline resume content")).toContainText("Professional Summary");
   await page.getByLabel("Job description").fill("Umbrella Corp is hiring a Director of Engineering.");
 }

@@ -1,8 +1,10 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { type HistoryEntry, pdfUrl } from "@/lib/api";
+
+import PanelTitle from "./PanelTitle";
 
 type Props = { entries: HistoryEntry[]; onClear: () => void };
 
@@ -13,22 +15,21 @@ export const MAX_VISIBLE = 10;
 
 /** Past downloads, newest first: company, time, generating model (when recorded) and a re-download link.
  * "Clear history" asks for confirmation, then calls onClear. The list is as tall as its first
- * MAX_VISIBLE rows (measured, since rows can wrap) and scrolls beyond that. */
+ * MAX_VISIBLE rows (measured, since rows can wrap) and scrolls beyond that. Starts expanded. */
 export default function HistoryPanel({ entries, onClear }: Props) {
+  const [open, setOpen] = useState(true);
   const list = useRef<HTMLUListElement>(null);
 
   useLayoutEffect(() => {
     if (!list.current) return;
     const last = list.current.children[MAX_VISIBLE - 1] as HTMLElement | undefined;
     list.current.style.maxHeight = last && entries.length > MAX_VISIBLE ? `${last.offsetTop + last.offsetHeight}px` : "";
-  }, [entries]);
+  }, [entries, open]);
 
   return (
     <section aria-labelledby="history-heading" className="rounded-lg border border-line bg-surface p-4">
       <div className="mb-2 flex items-center justify-between">
-        <h2 id="history-heading" className="font-semibold">
-          Download history
-        </h2>
+        <PanelTitle id="history-heading" title="Download history" open={open} onToggle={() => setOpen(!open)} />
         {entries.length > 0 && (
           <button
             onClick={() => window.confirm(CLEAR_CONFIRM) && onClear()}
@@ -38,7 +39,7 @@ export default function HistoryPanel({ entries, onClear }: Props) {
           </button>
         )}
       </div>
-      {entries.length === 0 ? (
+      {!open ? null : entries.length === 0 ? (
         <p className="text-sm text-ink/60">No downloads yet.</p>
       ) : (
         <ul ref={list} className="relative divide-y divide-line overflow-y-auto text-sm">

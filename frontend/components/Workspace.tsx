@@ -28,7 +28,8 @@ export function settingsNote(prefs: api.Preferences): string {
 
 /** Signed-in workspace: loads and saves the user's data and runs the AI chat (after pending preference saves). */
 export default function Workspace() {
-  const [baseline, setBaseline] = useState<string | null>(null);
+  /** undefined while loading, so the baseline panel can start collapsed when one is saved. */
+  const [baseline, setBaseline] = useState<string | null | undefined>(undefined);
   const [jobDescription, setJobDescription] = useState("");
   const [customResume, setCustomResume] = useState<CustomResumeData | null>(null);
   const [history, setHistory] = useState<api.HistoryEntry[]>([]);
@@ -105,7 +106,7 @@ export default function Workspace() {
   return (
     <div className="flex flex-1 overflow-hidden">
       <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
-        <ResumePanel content={baseline} onUpload={uploadBaseline} />
+        {baseline !== undefined && <ResumePanel content={baseline} onUpload={uploadBaseline} />}
         <JobDescription value={jobDescription} onChange={setJobDescription} />
         <CustomResume
           resume={customResume}

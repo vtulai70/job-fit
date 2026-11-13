@@ -3,17 +3,19 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { signIn, signOut } from "./helpers";
+import { showBaseline, signIn, signOut } from "./helpers";
 
 const RESUME = path.join(__dirname, "..", "..", "resume.md");
 
 test("uploaded baseline survives logout and login", async ({ page }) => {
   await signIn(page);
   await page.locator('input[type="file"]').setInputFiles(RESUME);
+  await showBaseline(page);
   await expect(page.getByLabel("Baseline resume content")).toContainText("Professional Summary");
 
   await signOut(page);
   await signIn(page);
+  await showBaseline(page);
   await expect(page.getByLabel("Baseline resume content")).toContainText("Professional Summary");
 });
 
@@ -24,9 +26,36 @@ test("replacing the baseline persists the new content", async ({ page }) => {
     mimeType: "text/markdown",
     buffer: Buffer.from("# Short resume\n\nOnly this"),
   });
+  await showBaseline(page);
   await expect(page.getByLabel("Baseline resume content")).toHaveText("# Short resume\n\nOnly this");
   await page.reload();
+  await showBaseline(page);
   await expect(page.getByLabel("Baseline resume content")).toHaveText("# Short resume\n\nOnly this");
+});
+
+test("baseline starts collapsed once saved; panels expand and collapse", async ({ page }) => {
+  await signIn(page);
+  const baseline = page.getByRole("button", { name: "Baseline resume" });
+  await expect(baseline).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByLabel("Baseline resume content")).toHaveCount(0);
+  await expect(page.getByText("Upload resume")).toBeVisible();
+  await baseline.click();
+  await expect(page.getByLabel("Baseline resume content")).toBeVisible();
+
+  const prefs = page.getByRole("button", { name: "Preferences" });
+  await expect(prefs).toHaveAttribute("aria-expanded", "true");
+  await prefs.click();
+  await expect(page.getByLabel("Tone")).toHaveCount(0);
+  await prefs.click();
+  await expect(page.getByLabel("Tone")).toBeVisible();
+
+  const history = page.getByRole("region", { name: "Download history" });
+  const historyToggle = history.getByRole("button", { name: "Download history" });
+  await expect(historyToggle).toHaveAttribute("aria-expanded", "true");
+  await historyToggle.click();
+  await expect(historyToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(history.getByRole("list")).toHaveCount(0);
+  await expect(history.getByText("No downloads yet.")).toHaveCount(0);
 });
 
 test("preferences persist across reload", async ({ page }) => {

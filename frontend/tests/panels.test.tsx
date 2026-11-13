@@ -66,7 +66,19 @@ test("history lists entries with re-download links", () => {
 
 test("preferences have no save button", () => {
   render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
-  expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Preferences"]);
+});
+
+test("preferences start expanded and collapse, keeping edited values", async () => {
+  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  const toggle = screen.getByRole("button", { name: "Preferences" });
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await userEvent.type(screen.getByLabelText("Tone"), "bold");
+  await userEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByLabelText("Tone")).not.toBeInTheDocument();
+  await userEvent.click(toggle);
+  expect(screen.getByLabelText("Tone")).toHaveValue("bold");
 });
 
 test("preferences form shows initial values", () => {
@@ -220,4 +232,27 @@ test("history list is capped at the 10th row only when there are more than 10 en
   expect(screen.getAllByRole("listitem")).toHaveLength(11);
   rerender(<HistoryPanel entries={entries(3)} onClear={vi.fn()} />);
   expect(screen.getByRole("list").style.maxHeight).toBe("");
+});
+
+test("history starts expanded and collapses, keeping Clear history in the header", async () => {
+  render(<HistoryPanel entries={entries(2)} onClear={vi.fn()} />);
+  const toggle = screen.getByRole("button", { name: "Download history" });
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  await userEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("list")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Clear history" })).toBeInTheDocument();
+  await userEvent.click(toggle);
+  expect(screen.getAllByRole("listitem")).toHaveLength(2);
+});
+
+test("history cap is applied when the panel is expanded again", async () => {
+  vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(333);
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(37);
+  render(<HistoryPanel entries={entries(11)} onClear={vi.fn()} />);
+  const toggle = screen.getByRole("button", { name: "Download history" });
+  await userEvent.click(toggle);
+  await userEvent.click(toggle);
+  expect(screen.getByRole("list").style.maxHeight).toBe("370px");
 });
