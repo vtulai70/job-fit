@@ -2,11 +2,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
-import Workspace, { CLEAR_FAILED, GENERATE_MESSAGE } from "@/components/Workspace";
+import Workspace, { CLEAR_FAILED, GENERATE_MESSAGE, settingsNote } from "@/components/Workspace";
+import type { Preferences } from "@/lib/api";
 
 import { mockFetch } from "./fetchMock";
 
-const PREFS = {
+const PREFS: Preferences = {
   style: "modern",
   tone: "concise",
   max_pages: 2,
@@ -306,13 +307,22 @@ function chatLines() {
   return [...screen.getByRole("log", { name: "Conversation" }).children].map((el) => el.textContent);
 }
 
-test("the model is shown in the chat before the generate prompt", async () => {
+const DEFAULT_NOTE = "Model: openai/gpt-oss-120b\nProfessional Experience: 15 years\nEarlier Experience: 10 years\nTone: concise";
+
+test("settings note lists model, experience years and tone; notes only when set", () => {
+  expect(settingsNote(PREFS)).toBe(DEFAULT_NOTE);
+  expect(settingsNote({ ...PREFS, tone: "  ", notes: " Lead with AI ", earlier_years: 0 })).toBe(
+    "Model: openai/gpt-oss-120b\nProfessional Experience: 15 years\nEarlier Experience: 0 years\nTone: no preference\nNotes: Lead with AI",
+  );
+});
+
+test("the model and settings are shown in the chat before the generate prompt", async () => {
   mockChat({ body: RESUME_RESULT });
   await ready();
   await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
   await screen.findByText("Here is your resume.");
   expect(chatLines()).toEqual([
-    "Model: openai/gpt-oss-120b",
+    DEFAULT_NOTE,
     `You: ${GENERATE_MESSAGE}`,
     "AI: Here is your resume.",
   ]);
@@ -332,14 +342,15 @@ test("the model note shows the saved model and is not sent to the AI", async () 
   await userEvent.type(screen.getByLabelText("Message"), "Teams of 40{Enter}");
   await screen.findByText("Here is your resume.");
 
-  expect(screen.getAllByText("Model: anthropic/claude-haiku-5.5")).toHaveLength(2);
+  const notes = chatLines().filter((line) => line!.startsWith("Model: "));
+  expect(notes).toEqual(Array(2).fill(DEFAULT_NOTE.replace("openai/gpt-oss-120b", "anthropic/claude-haiku-5.5")));
   expect(generateBodies(fetchMock)[1].history).toEqual([
     { role: "user", content: GENERATE_MESSAGE },
     { role: "assistant", content: "Which team size should I emphasize?" },
   ]);
 });
 
-test("after choosing a different model the next generate names it", async () => {
+test("after changing settings the next generate's note shows them", async () => {
   mockChat({ body: RESUME_RESULT });
   const fetchMock = vi.mocked(fetch);
   const base = fetchMock.getMockImplementation()!;
@@ -350,8 +361,15 @@ test("after choosing a different model the next generate names it", async () => 
   );
   await ready();
   await userEvent.selectOptions(screen.getByLabelText("AI model"), "openai/gpt-5.4-nano");
+  await userEvent.clear(screen.getByLabelText("Professional Experience (years)"));
+  await userEvent.type(screen.getByLabelText("Professional Experience (years)"), "8");
+  await userEvent.clear(screen.getByLabelText("Tone"));
+  await userEvent.type(screen.getByLabelText("Notes for the AI"), "Stress mentoring");
   await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
-  expect(await screen.findByText("Model: openai/gpt-5.4-nano")).toBeInTheDocument();
+  await screen.findByText("Here is your resume.");
+  expect(chatLines()[0]).toBe(
+    "Model: openai/gpt-5.4-nano\nProfessional Experience: 8 years\nEarlier Experience: 10 years\nTone: no preference\nNotes: Stress mentoring",
+  );
 });
 
 test("generate waits for a pending preference save", async () => {

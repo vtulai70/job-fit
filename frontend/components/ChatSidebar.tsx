@@ -41,7 +41,7 @@ export default function ChatSidebar({ messages, busy, ready, canGenerate, onSend
         )}
         {messages.map((m, i) =>
           m.role === "info" ? (
-            <p key={i} className="text-center text-xs text-ink/60">
+            <p key={i} className="whitespace-pre-line text-center text-xs text-ink/60">
               {m.content}
             </p>
           ) : (

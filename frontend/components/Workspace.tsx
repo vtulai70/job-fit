@@ -14,6 +14,18 @@ import ResumePanel from "./ResumePanel";
 export const GENERATE_MESSAGE = "Please generate my custom resume for this job description.";
 export const CLEAR_FAILED = "Could not clear the download history. Please try again.";
 
+/** Chat note naming the settings the next prompt is generated with, one per line; Notes only when set. */
+export function settingsNote(prefs: api.Preferences): string {
+  const lines = [
+    `Model: ${prefs.model}`,
+    `Professional Experience: ${prefs.professional_years} years`,
+    `Earlier Experience: ${prefs.earlier_years} years`,
+    `Tone: ${prefs.tone.trim() || "no preference"}`,
+  ];
+  if (prefs.notes.trim()) lines.push(`Notes: ${prefs.notes.trim()}`);
+  return lines.join("\n");
+}
+
 /** Signed-in workspace: loads and saves the user's data and runs the AI chat (after pending preference saves). */
 export default function Workspace() {
   const [baseline, setBaseline] = useState<string | null>(null);
@@ -51,11 +63,11 @@ export default function Workspace() {
     prefsSaved.current = prefsSaved.current.catch(() => {}).then(() => api.putPreferences(next));
   }
 
-  /** Show which model will answer, then send the message with the AI conversation so far. */
+  /** Show the model and settings that will be used, then send the message with the AI conversation so far. */
   async function send(text: string) {
     const sent: api.ChatEntry[] = [
       ...messages,
-      { role: "info", content: `Model: ${prefs!.model}` },
+      { role: "info", content: settingsNote(prefs!) },
       { role: "user", content: text },
     ];
     const history = messages.filter((m): m is api.ChatMessage => m.role !== "info");

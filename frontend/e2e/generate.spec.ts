@@ -79,29 +79,42 @@ test("clarifying question is answered in chat before the resume", async ({ page 
   expect((bodies[1].history as unknown[]).length).toBe(2);
 });
 
-test("chat names the saved model before each prompt it sends", async ({ page }) => {
+test("chat shows the model and settings before each prompt it sends", async ({ page }) => {
   await mockGenerate(page, [
     { reply: "Which focus?", company: "Umbrella Corp", resume_md: null },
     { reply: "Done.", company: "Umbrella Corp", resume_md: TAILORED },
   ]);
   await prepare(page);
   await page.getByLabel("AI model").selectOption("openai/gpt-5.4-nano");
+  await page.getByLabel("Professional Experience (years)").fill("9");
+  await page.getByLabel("Earlier Experience (years)").fill("3");
+  await page.getByLabel("Tone").fill("warm");
+  await page.getByLabel("Notes for the AI").fill("");
 
   await page.getByRole("button", { name: "Generate custom resume" }).click();
   const chat = page.getByRole("log", { name: "Conversation" });
   await expect(chat.getByText("Which focus?")).toBeVisible();
   await page.getByLabel("AI model").selectOption("openai/gpt-oss-120b");
+  await page.getByLabel("Tone").fill("");
+  await page.getByLabel("Notes for the AI").fill("Stress mentoring");
   await page.getByLabel("Message").fill("Platform");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(chat.getByText("Done.")).toBeVisible();
 
   await expect(chat.locator(":scope > *")).toHaveText([
-    "Model: openai/gpt-5.4-nano",
+    "Model: openai/gpt-5.4-nano\nProfessional Experience: 9 years\nEarlier Experience: 3 years\nTone: warm",
     "You: Please generate my custom resume for this job description.",
     "AI: Which focus?",
-    "Model: openai/gpt-oss-120b",
+    "Model: openai/gpt-oss-120b\nProfessional Experience: 9 years\nEarlier Experience: 3 years\nTone: no preference\nNotes: Stress mentoring",
     "You: Platform",
     "AI: Done.",
+  ]);
+  const firstNote = await chat.locator(":scope > *").first().evaluate((el) => (el as HTMLElement).innerText);
+  expect(firstNote.split("\n")).toEqual([
+    "Model: openai/gpt-5.4-nano",
+    "Professional Experience: 9 years",
+    "Earlier Experience: 3 years",
+    "Tone: warm",
   ]);
 });
 
