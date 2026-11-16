@@ -22,6 +22,13 @@ Model = Literal[
 ]
 
 MODEL: Model = "openai/gpt-oss-120b"
+# Models that need the premium_models plan feature (the costliest per resume; see docs/PLAN.md Step 12).
+PREMIUM_MODELS: tuple[Model, ...] = (
+    "anthropic/claude-opus-5.5",
+    "anthropic/claude-sonnet-5.5",
+    "openai/gpt-6-sol",
+    "google/gemini-4-argon",
+)
 
 router = APIRouter(prefix="/api/ai")
 

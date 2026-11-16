@@ -25,9 +25,9 @@ SIGNING_KEY, PUBLIC_PEM = make_keys()
 OTHER_KEY, _ = make_keys()
 
 
-def token(sub="user_alice", azp=ORIGIN, expires_in=60, key=SIGNING_KEY):
+def token(sub="user_alice", azp=ORIGIN, expires_in=60, key=SIGNING_KEY, **extra):
     now = int(time.time())
-    claims = {"sub": sub, "azp": azp, "iat": now, "nbf": now - 5, "exp": now + expires_in, "sid": "sess_1"}
+    claims = {"sub": sub, "azp": azp, "iat": now, "nbf": now - 5, "exp": now + expires_in, "sid": "sess_1", **extra}
     return jwt.encode(claims, key, algorithm="RS256")
 
 
@@ -105,3 +105,16 @@ def test_authorized_parties_default(monkeypatch):
     monkeypatch.setenv("CLERK_SECRET_KEY", "sk_test_x")
     monkeypatch.delenv("CLERK_AUTHORIZED_PARTIES", raising=False)
     assert auth.auth_options().authorized_parties == ["http://localhost:8000"]
+
+
+def test_plan_comes_from_the_verified_token_claims(clerk):
+    claims = {"pla": "u:basic", "fea": "u:pdf_download"}
+    clerk.cookies.set("__session", token(**claims))
+    body = clerk.get("/api/plan").json()
+    assert (body["plan"], body["features"], body["limit"]) == ("basic", ["pdf_download"], 50)
+
+
+def test_plan_defaults_to_free_without_billing_claims(clerk):
+    clerk.cookies.set("__session", token())
+    body = clerk.get("/api/plan").json()
+    assert (body["plan"], body["features"], body["limit"]) == ("free", [], 5)

@@ -19,6 +19,22 @@ export const MODELS = [
 
 export type Model = (typeof MODELS)[number];
 
+/** Models that need the Pro plan; keep in sync with `PREMIUM_MODELS` in `backend/app/ai.py`. */
+export const PREMIUM_MODELS: readonly Model[] = [
+  "anthropic/claude-opus-5.5",
+  "anthropic/claude-sonnet-5.5",
+  "openai/gpt-6-sol",
+  "google/gemini-4-argon",
+];
+
+/** The user's Clerk plan, its features, the monthly resume limit, resumes used this month and when that resets. */
+export type PlanInfo = { plan: string; features: string[]; limit: number; used: number; resets_at: string };
+
+export const PDF_PLAN_NOTE = "PDF download is available on the Basic and Pro plans.";
+
+/** Plan key as shown to the user, e.g. "Basic". */
+export const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);
+
 /** Pro mode needs 2 to 4 candidate models (the backend validates the same limits). */
 export const PRO_MIN_MODELS = 2;
 export const PRO_MAX_MODELS = 4;
@@ -111,13 +127,30 @@ export type NewHistoryEntry = {
 } & GenerationSettings &
   Partial<ProFields>;
 
+/** A failed API call; `detail` is the backend's message for the user, when it sent one. */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly detail: string | null,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(path, {
     method,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`${method} ${path} failed: ${response.status}`);
+  if (!response.ok) {
+    const detail = await response.json().then(
+      (data) => (typeof data?.detail === "string" ? data.detail : null),
+      () => null,
+    );
+    throw new ApiError(response.status, detail, `${method} ${path} failed: ${response.status}`);
+  }
   return response.json();
 }
 
@@ -125,6 +158,8 @@ export const getBaseline = () => request<Baseline>("GET", "/api/resume/baseline"
 
 export const putBaseline = (content_md: string) =>
   request<Baseline>("PUT", "/api/resume/baseline", { content_md });
+
+export const getPlan = () => request<PlanInfo>("GET", "/api/plan");
 
 export const getPreferences = () => request<Preferences>("GET", "/api/preferences");
 

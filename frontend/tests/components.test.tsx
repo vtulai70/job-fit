@@ -61,7 +61,7 @@ const SETTINGS = {
   tone: "",
   notes: "",
 } as const;
-const PREVIEW = { style: "modern" as const, renderPreview: vi.fn(), onStyleChange: vi.fn() };
+const PREVIEW = { style: "modern" as const, renderPreview: vi.fn(), onStyleChange: vi.fn(), canDownload: true };
 
 test("custom resume shows placeholder and no download when empty", () => {
   render(<CustomResume {...PREVIEW} resume={null} onChange={vi.fn()} onDownload={vi.fn()} />);
@@ -112,6 +112,7 @@ test("preview mode renders the resume in the PDF style and toggles back to the e
       style="classic"
       renderPreview={renderPreview}
       onStyleChange={vi.fn()}
+      canDownload
       onChange={vi.fn()}
       onDownload={vi.fn()}
     />,
@@ -132,7 +133,7 @@ test("preview mode renders the resume in the PDF style and toggles back to the e
 
 test("preview re-renders when the resume or style changes", async () => {
   const renderPreview = vi.fn(async (md: string, style: string) => `${style}:${md}`);
-  const props = { renderPreview, onChange: vi.fn(), onStyleChange: vi.fn(), onDownload: vi.fn() };
+  const props = { renderPreview, onChange: vi.fn(), onStyleChange: vi.fn(), onDownload: vi.fn(), canDownload: true };
   const { rerender } = render(<CustomResume {...props} style="modern" resume={{ company: "A", content_md: "# One", settings: SETTINGS }} />);
   await userEvent.click(screen.getByRole("button", { name: "Preview" }));
   await vi.waitFor(() => expect(previewTitle()).toHaveAttribute("srcdoc", "modern:# One"));
@@ -177,4 +178,18 @@ test("baseline panel notes the resume should be in an AI-friendly format like Ma
   expect(screen.queryByText(FORMAT_NOTE)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Baseline resume" }));
   expect(screen.getByText(FORMAT_NOTE)).toBeInTheDocument();
+});
+
+test("without PDF download on the plan, Download PDF is disabled with a note", () => {
+  render(
+    <CustomResume
+      {...PREVIEW}
+      canDownload={false}
+      resume={{ company: "Acme", content_md: "# Tailored", settings: SETTINGS }}
+      onChange={vi.fn()}
+      onDownload={vi.fn()}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "Download PDF" })).toBeDisabled();
+  expect(screen.getByText("PDF download is available on the Basic and Pro plans.")).toBeInTheDocument();
 });

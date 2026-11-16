@@ -1,11 +1,34 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
-import Workspace, { busyText, CLEAR_FAILED, failureNote, GENERATE_MESSAGE, settingsNote } from "@/components/Workspace";
-import type { Preferences, ProFailure } from "@/lib/api";
+import Workspace, {
+  busyText,
+  CLEAR_FAILED,
+  failureNote,
+  failureReply,
+  GENERATE_FAILED,
+  GENERATE_MESSAGE,
+  settingsNote,
+} from "@/components/Workspace";
+import { ApiError, type Preferences, type ProFailure } from "@/lib/api";
 
 import { mockFetch } from "./fetchMock";
+
+const clerk = vi.hoisted(() => ({ getToken: vi.fn(async () => "token") }));
+
+vi.mock("@clerk/react", () => ({
+  useAuth: () => ({ getToken: clerk.getToken }),
+  PricingTable: (props: { for: string }) => <div data-testid="pricing-table" data-for={props.for} />,
+}));
+
+const PRO_PLAN = {
+  plan: "pro",
+  features: ["pdf_download", "premium_models", "pro_mode"],
+  limit: 200,
+  used: 3,
+  resets_at: "2026-12-01T00:00:00Z",
+};
 
 const PREFS: Preferences = {
   style: "modern",
@@ -30,6 +53,7 @@ function mockData(baseline: string | null = "# Saved resume") {
     "GET /api/resume/baseline": { body: { content_md: baseline, updated_at: null } },
     "GET /api/history": { body: HISTORY },
     "GET /api/preferences": { body: PREFS },
+    "GET /api/plan": { body: PRO_PLAN },
     "PUT /api/resume/baseline": { body: { content_md: "# New resume", updated_at: "t" } },
     "PUT /api/preferences": { body: { ...PREFS, style: "classic" } },
   });
@@ -714,4 +738,68 @@ test("clearing the conversation empties the chat, keeps the resume, and starts t
   await userEvent.type(screen.getByLabelText("Message"), "Start over{Enter}");
   await screen.findByText(QUESTION_RESULT.reply);
   expect(generateBodies(fetchMock)[1].history).toEqual([]);
+});
+
+const FREE_PLAN = { plan: "free", features: [], limit: 5, used: 5, resets_at: "2026-12-01T00:00:00Z" };
+
+/** Answer GET /api/plan with each plan in turn (the last one repeats). */
+function mockPlans(fetchMock: ReturnType<typeof mockData>, ...plans: object[]) {
+  const base = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
+    url === "/api/plan" ? Response.json(plans.length > 1 ? plans.shift() : plans[0]) : base(url, init),
+  );
+}
+
+function planRequests(fetchMock: ReturnType<typeof mockData>) {
+  return fetchMock.mock.calls.filter(([url]) => url === "/api/plan").length;
+}
+
+test("the chat shows this month's usage and refreshes it after each generation", async () => {
+  const fetchMock = mockChat({ body: RESUME_RESULT });
+  mockPlans(fetchMock, PRO_PLAN, { ...PRO_PLAN, used: 4 });
+  await ready();
+  expect(await screen.findByText("3 of 200 resumes this month · Pro plan")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  expect(await screen.findByText("4 of 200 resumes this month · Pro plan")).toBeInTheDocument();
+  expect(planRequests(fetchMock)).toBe(2);
+});
+
+test("a generation blocked by the plan shows the backend's reason in the chat", async () => {
+  const detail = "You have used all 5 resumes of the Free plan this month. They reset on December 1; upgrade under Plans for more.";
+  mockChat({ status: 429, body: { detail } });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  expect(await screen.findByText(detail)).toBeInTheDocument();
+  expect(screen.queryByText(GENERATE_FAILED)).not.toBeInTheDocument();
+});
+
+test("other failures keep the generic message", () => {
+  expect(failureReply(new ApiError(500, "Internal", "x"))).toBe(GENERATE_FAILED);
+  expect(failureReply(new Error("network"))).toBe(GENERATE_FAILED);
+  expect(failureReply(new ApiError(403, "Pro mode is available on the Pro plan.", "x"))).toBe(
+    "Pro mode is available on the Pro plan.",
+  );
+});
+
+test("Plans opens Clerk's pricing table; closing it refreshes the session token, then the plan", async () => {
+  const fetchMock = mockData();
+  mockPlans(fetchMock, FREE_PLAN, { ...PRO_PLAN, used: 5 });
+  render(<Workspace />);
+  await userEvent.click(await screen.findByRole("button", { name: "Plans" }));
+  const dialog = screen.getByRole("dialog", { name: "Plans" });
+  expect(within(dialog).getByTestId("pricing-table")).toHaveAttribute("data-for", "user");
+  await userEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(clerk.getToken).toHaveBeenCalledWith({ skipCache: true });
+  expect(await screen.findByText("5 of 200 resumes this month · Pro plan")).toBeInTheDocument();
+});
+
+test("on the free plan, PDF download and re-download are disabled", async () => {
+  const fetchMock = mockChat({ body: RESUME_RESULT });
+  mockPlans(fetchMock, FREE_PLAN);
+  await ready();
+  await screen.findByText("5 of 5 resumes this month · Free plan");
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  expect(await screen.findByRole("button", { name: "Download PDF" })).toBeDisabled();
+  expect(screen.queryByRole("link", { name: "Download Acme resume" })).not.toBeInTheDocument();
 });

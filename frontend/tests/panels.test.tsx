@@ -8,11 +8,22 @@ import PreferencesPanel, { proModelsWithout } from "@/components/PreferencesPane
 import type { Preferences } from "@/lib/api";
 
 /** The panel with its preferences held in state, as Workspace does. */
-function Stateful({ initial, onChange }: { initial: Preferences; onChange: (prefs: Preferences) => void }) {
+const ALL_FEATURES = ["pdf_download", "premium_models", "pro_mode"];
+
+function Stateful({
+  initial,
+  onChange,
+  features = ALL_FEATURES,
+}: {
+  initial: Preferences;
+  onChange: (prefs: Preferences) => void;
+  features?: string[];
+}) {
   const [prefs, setPrefs] = useState(initial);
   return (
     <PreferencesPanel
       prefs={prefs}
+      features={features}
       onChange={(next) => {
         setPrefs(next);
         onChange(next);
@@ -37,7 +48,7 @@ const PREFS: Preferences = {
 };
 
 test("history shows empty state", () => {
-  render(<HistoryPanel onClear={vi.fn()} entries={[]} />);
+  render(<HistoryPanel canDownload onClear={vi.fn()} entries={[]} />);
   expect(screen.getByText("No downloads yet.")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Clear history" })).not.toBeInTheDocument();
 });
@@ -48,7 +59,7 @@ test("clear history asks for confirmation, then calls onClear", async () => {
   const confirm = vi.fn().mockReturnValue(true);
   vi.stubGlobal("confirm", confirm);
   const onClear = vi.fn();
-  render(<HistoryPanel entries={[ENTRY]} onClear={onClear} />);
+  render(<HistoryPanel canDownload entries={[ENTRY]} onClear={onClear} />);
   await userEvent.click(screen.getByRole("button", { name: "Clear history" }));
   expect(confirm).toHaveBeenCalledWith(CLEAR_CONFIRM);
   expect(onClear).toHaveBeenCalledOnce();
@@ -57,14 +68,14 @@ test("clear history asks for confirmation, then calls onClear", async () => {
 test("cancelling the confirmation keeps the history", async () => {
   vi.stubGlobal("confirm", vi.fn().mockReturnValue(false));
   const onClear = vi.fn();
-  render(<HistoryPanel entries={[ENTRY]} onClear={onClear} />);
+  render(<HistoryPanel canDownload entries={[ENTRY]} onClear={onClear} />);
   await userEvent.click(screen.getByRole("button", { name: "Clear history" }));
   expect(onClear).not.toHaveBeenCalled();
 });
 
 test("history lists entries with re-download links", () => {
   render(
-    <HistoryPanel
+    <HistoryPanel canDownload
       onClear={vi.fn()}
       entries={[
         { id: 2, company: "Beta", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-6-sol", optimization: "full", professional_years: 12, earlier_years: 0, max_pages: 3, tone: "", notes: "Lead with AI", pro_judge_model: null, pro_rank: null },
@@ -242,17 +253,17 @@ function entries(count: number) {
 test("history list is capped at the 10th row only when there are more than 10 entries", () => {
   vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(333);
   vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(37);
-  const { rerender } = render(<HistoryPanel entries={entries(10)} onClear={vi.fn()} />);
+  const { rerender } = render(<HistoryPanel canDownload entries={entries(10)} onClear={vi.fn()} />);
   expect(screen.getByRole("list").style.maxHeight).toBe("");
-  rerender(<HistoryPanel entries={entries(11)} onClear={vi.fn()} />);
+  rerender(<HistoryPanel canDownload entries={entries(11)} onClear={vi.fn()} />);
   expect(screen.getByRole("list").style.maxHeight).toBe("370px");
   expect(screen.getAllByRole("listitem")).toHaveLength(11);
-  rerender(<HistoryPanel entries={entries(3)} onClear={vi.fn()} />);
+  rerender(<HistoryPanel canDownload entries={entries(3)} onClear={vi.fn()} />);
   expect(screen.getByRole("list").style.maxHeight).toBe("");
 });
 
 test("history starts expanded and collapses, keeping Clear history in the header", async () => {
-  render(<HistoryPanel entries={entries(2)} onClear={vi.fn()} />);
+  render(<HistoryPanel canDownload entries={entries(2)} onClear={vi.fn()} />);
   const toggle = screen.getByRole("button", { name: "Download history" });
   expect(toggle).toHaveAttribute("aria-expanded", "true");
   expect(screen.getAllByRole("listitem")).toHaveLength(2);
@@ -267,7 +278,7 @@ test("history starts expanded and collapses, keeping Clear history in the header
 test("history cap is applied when the panel is expanded again", async () => {
   vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(333);
   vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(37);
-  render(<HistoryPanel entries={entries(11)} onClear={vi.fn()} />);
+  render(<HistoryPanel canDownload entries={entries(11)} onClear={vi.fn()} />);
   const toggle = screen.getByRole("button", { name: "Download history" });
   await userEvent.click(toggle);
   await userEvent.click(toggle);
@@ -448,4 +459,42 @@ test("preferences are ordered: model, Pro, optimization, tone, notes, experience
     GRADUATION,
     "Max pages",
   ]);
+});
+
+test("without PDF download on the plan, history is listed but re-download is disabled", () => {
+  render(<HistoryPanel canDownload={false} entries={[ENTRY]} onClear={vi.fn()} />);
+  expect(screen.getByText("Acme")).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Download Acme resume" })).not.toBeInTheDocument();
+  expect(screen.getByText("Download")).toHaveAttribute("title", "PDF download is available on the Basic and Pro plans.");
+});
+
+test("without premium models, those models are disabled and marked, except the one already chosen", () => {
+  render(<Stateful initial={{ ...PREFS, model: "openai/gpt-6-sol" }} onChange={vi.fn()} features={["pdf_download"]} />);
+  const options = within(screen.getByLabelText("AI model")).getAllByRole("option") as HTMLOptionElement[];
+  const locked = options.filter((o) => o.disabled).map((o) => o.value);
+  expect(locked).toEqual(["anthropic/claude-opus-5.5", "anthropic/claude-sonnet-5.5", "google/gemini-4-argon"]);
+  expect(options.find((o) => o.value === "anthropic/claude-opus-5.5")!.textContent).toBe("anthropic/claude-opus-5.5 (Pro plan)");
+  expect(options.find((o) => o.value === "openai/gpt-6-sol")!.disabled).toBe(false);
+});
+
+test("without Pro mode on the plan, it cannot be turned on but can be turned off", async () => {
+  const onChange = vi.fn();
+  const { unmount } = render(<Stateful initial={PREFS} onChange={onChange} features={[]} />);
+  expect(screen.getByRole("checkbox", { name: "Pro mode" })).toBeDisabled();
+  expect(screen.getByText("Pro plan")).toBeInTheDocument();
+  unmount();
+  render(<Stateful initial={{ ...PREFS, pro_mode: true }} onChange={onChange} features={[]} />);
+  const pro = screen.getByRole("checkbox", { name: "Pro mode" });
+  expect(pro).toBeEnabled();
+  await userEvent.click(pro);
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ pro_mode: false }));
+});
+
+test("without premium models, premium Pro models cannot be added but can be removed", () => {
+  const prefs = { ...PREFS, pro_mode: true, pro_models: ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5", "openai/gpt-5.4-nano"] as Preferences["pro_models"] };
+  render(<Stateful initial={prefs} onChange={vi.fn()} features={["pro_mode"]} />);
+  expect(proCheckbox("openai/gpt-6-sol")).toBeDisabled();
+  expect(proCheckbox("openai/gpt-6-sol")).toHaveAccessibleName("openai/gpt-6-sol (Pro plan)");
+  expect(proCheckbox("anthropic/claude-sonnet-5.5")).toBeEnabled();
+  expect(proCheckbox("google/gemini-3.8-flash")).toBeEnabled();
 });

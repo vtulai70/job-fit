@@ -98,3 +98,26 @@ test("toneLabel shows no preference for an empty tone", () => {
   expect(api.toneLabel("  ")).toBe("no preference");
   expect(api.toneLabel(" warm ")).toBe("warm");
 });
+
+test("a failed call carries the backend's message for the user", async () => {
+  mockFetch({ "POST /api/generate": { status: 429, body: { detail: "You have used all 5 resumes." } } });
+  const error = await api.generate({ job_description: "j", message: "m", history: [] }).catch((e) => e);
+  expect(error).toBeInstanceOf(api.ApiError);
+  expect([error.status, error.detail]).toEqual([429, "You have used all 5 resumes."]);
+});
+
+test("a failed call without a message has no detail", async () => {
+  mockFetch({ "GET /api/plan": { status: 500 } });
+  const error = await api.getPlan().catch((e) => e);
+  expect([error.status, error.detail]).toEqual([500, null]);
+});
+
+test("plan names and premium models match the backend", () => {
+  expect(api.planName("basic")).toBe("Basic");
+  expect(api.PREMIUM_MODELS).toEqual([
+    "anthropic/claude-opus-5.5",
+    "anthropic/claude-sonnet-5.5",
+    "openai/gpt-6-sol",
+    "google/gemini-4-argon",
+  ]);
+});

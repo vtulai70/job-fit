@@ -5,7 +5,7 @@ The full schema is in `docs/schema.json`. This document explains the approach.
 ## Approach
 
 - SQLite file at `data/jobfit.db`. In Docker, `data/` is the host-mounted volume, so data survives container restarts.
-- Access through Python's stdlib `sqlite3`. No ORM: four small tables and simple queries do not need one.
+- Access through Python's stdlib `sqlite3`. No ORM: five small tables and simple queries do not need one.
 - On startup the backend creates the `data/` directory and the tables if missing (`CREATE TABLE IF NOT EXISTS`). A user row is created on each Clerk user's first request. No migration tool for the MVP; columns added later (the `custom_resumes` generation settings: `model`, `optimization`, `professional_years`, `earlier_years`, `max_pages`, `tone`, `notes`, and the Pro fields `pro_judge_model`, `pro_rank`) are added by `init_db` with `ALTER TABLE` when missing.
 - One connection per request (FastAPI dependency), with `PRAGMA foreign_keys = ON` and `row_factory = sqlite3.Row`.
 - Timestamps are ISO-8601 UTC text.
@@ -18,6 +18,7 @@ The full schema is in `docs/schema.json`. This document explains the approach.
 | `users` | Accounts; `username` holds the Clerk user id (e.g. `user_2abc...`) | 1 |
 | `baseline_resumes` | Current baseline resume as markdown; upload replaces it | 0..1 |
 | `custom_resumes` | Download history: company, job description, generated markdown, PDF style, timestamp, and the generation settings (model, optimization level, experience years, max pages, tone, notes); for a judged Pro candidate, the judge model and its rank | 0..n |
+| `generations` | One row per resume produced (a Pro mode run adds one per candidate that returned a resume), for the monthly plan limits | 0..n |
 | `preferences` | JSON object of preferences; no row means defaults | 0..1 |
 
 ## SQL
@@ -57,6 +58,16 @@ CREATE TABLE IF NOT EXISTS custom_resumes (
 );
 CREATE INDEX IF NOT EXISTS idx_custom_resumes_user_downloaded
     ON custom_resumes (user_id, downloaded_at);
+
+CREATE TABLE IF NOT EXISTS generations (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    generated_at TEXT NOT NULL,
+    model        TEXT NOT NULL,   -- the model that wrote the resume
+    pro          INTEGER NOT NULL -- 1 for a Pro mode candidate
+);
+CREATE INDEX IF NOT EXISTS idx_generations_user_generated
+    ON generations (user_id, generated_at);
 
 CREATE TABLE IF NOT EXISTS preferences (
     user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

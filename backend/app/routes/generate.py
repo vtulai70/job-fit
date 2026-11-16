@@ -1,17 +1,19 @@
 """Chat-based custom resume generation."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.ai import Client, ask_structured
+from app import plans
+from app.ai import PREMIUM_MODELS, Client, ask_structured
 from app.auth import UserId
 from app.db import Db
 from app.pro import ProResult, run_pro
 from app.prompt import build_pro_chat_prompt, build_system_prompt, context
-from app.routes.preferences import GenerationSettings, generation_settings, load_preferences
+from app.plans import CurrentPlan, Plan, record_generations, used_this_month
+from app.routes.preferences import GenerationSettings, Preferences, generation_settings, load_preferences
 
 router = APIRouter(prefix="/api")
 
@@ -76,14 +78,52 @@ def build_messages(system: str, history: list[ChatMessage], message: str) -> lis
     ]
 
 
+PRO_MODE_LOCKED = "Pro mode is available on the Pro plan. Turn it off in Preferences, or upgrade under Plans."
+
+
+def plan_name(plan: Plan) -> str:
+    return plan.key.capitalize()
+
+
+def check_access(plan: Plan, prefs: Preferences, used: int, resets_at: datetime) -> None:
+    """Raise 403 for Pro mode or premium models the plan lacks, 429 when the monthly allowance cannot cover
+    the resumes this turn may produce (one, or one per Pro model)."""
+    if prefs.pro_mode and not plan.has("pro_mode"):
+        raise HTTPException(status_code=403, detail=PRO_MODE_LOCKED)
+    models = [prefs.model, *prefs.pro_models] if prefs.pro_mode else [prefs.model]
+    premium = [m for m in models if m in PREMIUM_MODELS]
+    if premium and not plan.has("premium_models"):
+        raise HTTPException(
+            status_code=403,
+            detail=f"{', '.join(premium)} {'is' if len(premium) == 1 else 'are'} available on the Pro plan. "
+            "Choose another model in Preferences, or upgrade under Plans.",
+        )
+    needed, left, reset = (len(prefs.pro_models) if prefs.pro_mode else 1), plan.limit - used, f"{resets_at:%B} {resets_at.day}"
+    if needed > left and prefs.pro_mode:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Pro mode needs {needed} resumes (one per Pro model), but you have {left} left this month. "
+            f"Choose fewer Pro models, wait until {reset}, or upgrade under Plans.",
+        )
+    if needed > left:
+        raise HTTPException(
+            status_code=429,
+            detail=f"You have used all {plan.limit} resumes of the {plan_name(plan)} plan this month. "
+            f"They reset on {reset}; upgrade under Plans for more.",
+        )
+
+
 @router.post("/generate")
-def generate(body: GenerateRequest, user_id: UserId, db: Db, client: Client) -> GenerateResponse:
+def generate(body: GenerateRequest, user_id: UserId, db: Db, client: Client, plan: CurrentPlan) -> GenerateResponse:
     """Ask the AI to tailor the baseline to the job, or to ask clarifying questions; returns the settings used.
 
     In Pro mode the AI model writes no resume: it asks questions or says it is ready, then the Pro models
-    write the resume and the AI model judges their resumes (see `pro_turn`).
+    write the resume and the AI model judges their resumes (see `pro_turn`). The plan is checked before any AI
+    call (`check_access`); each resume produced is recorded against the monthly allowance.
     """
     prefs = load_preferences(db, user_id)
+    moment = plans.utc_now()
+    check_access(plan, prefs, used_this_month(db, user_id, moment), plans.next_month_start(moment))
     baseline, year = load_baseline(db, user_id), date.today().year
     messages = build_messages(build_system_prompt(baseline, body.job_description, prefs, year), body.history, body.message)
     settings = generation_settings(prefs).model_dump()
@@ -92,8 +132,12 @@ def generate(body: GenerateRequest, user_id: UserId, db: Db, client: Client) -> 
         chat = ask_structured(client, build_messages(chat_system, body.history, body.message), ProChatResult, prefs.model)
         if not chat.ready:
             return GenerateResponse(reply=chat.reply, company=None, experience_plan=[], resume_md=None, **settings)
-        return pro_turn(client, messages, context(baseline, body.job_description, prefs, year), prefs, settings)
+        response = pro_turn(client, messages, context(baseline, body.job_description, prefs, year), prefs, settings)
+        record_generations(db, user_id, [c.model for c in response.pro.candidates], True, moment)
+        return response
     result = ask_structured(client, messages, GenerateResult, prefs.model)
+    if result.resume_md:
+        record_generations(db, user_id, [prefs.model], False, moment)
     return GenerateResponse(**result.model_dump(), **settings)
 
 

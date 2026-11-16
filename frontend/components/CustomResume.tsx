@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { type GenerationSettings, type Model, type ProCandidate, STYLES, type Style } from "@/lib/api";
+import { type GenerationSettings, type Model, PDF_PLAN_NOTE, type ProCandidate, STYLES, type Style } from "@/lib/api";
 
 /** `settings` are the preferences that generated the resume (saved with its download; for a Pro candidate,
  * `model` is the candidate's). `review` is the judge's review of a Pro candidate. */
@@ -33,6 +33,8 @@ type Props = {
   /** The saved PDF style was changed here (it is a preference, persisted by the caller). */
   onStyleChange: (style: Style) => void;
   onDownload: () => void;
+  /** False when the plan has no PDF download: the button is disabled with a note. */
+  canDownload: boolean;
 };
 
 const MODES: { mode: Mode; label: string }[] = [
@@ -41,7 +43,16 @@ const MODES: { mode: Mode; label: string }[] = [
 ];
 
 /** The generated custom resume: PDF style, editable Markdown or a preview as the PDF renders it, and PDF download. */
-export default function CustomResume({ resume, pro, style, renderPreview, onChange, onStyleChange, onDownload }: Props) {
+export default function CustomResume({
+  resume,
+  pro,
+  style,
+  renderPreview,
+  onChange,
+  onStyleChange,
+  onDownload,
+  canDownload,
+}: Props) {
   const [mode, setMode] = useState<Mode>("markdown");
   const [html, setHtml] = useState("");
   const content = resume?.content_md;
@@ -87,7 +98,7 @@ export default function CustomResume({ resume, pro, style, renderPreview, onChan
             </div>
             <button
               onClick={onDownload}
-              disabled={!resume.content_md.trim()}
+              disabled={!resume.content_md.trim() || !canDownload}
               className="rounded bg-primary px-3 py-1 text-sm font-semibold text-canvas disabled:opacity-40"
             >
               Download PDF
@@ -96,6 +107,7 @@ export default function CustomResume({ resume, pro, style, renderPreview, onChan
         )}
       </div>
       {!resume && <p className="text-sm text-ink/60">Your tailored resume will appear here.</p>}
+      {resume && !canDownload && <p className="mb-2 text-xs text-accent">{PDF_PLAN_NOTE}</p>}
       {resume && pro && <ProCandidates pro={pro} />}
       {resume && mode === "markdown" && (
         <>

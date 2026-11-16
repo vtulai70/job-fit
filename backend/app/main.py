@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app import ai
+from app import ai, plans
 from app.db import init_db
 from app.routes import generate, history, preferences, preview, resume
 
@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="JobFit", lifespan=lifespan)
-ROUTERS = (resume.router, history.router, preferences.router, preview.router, ai.router, generate.router)
+ROUTERS = (resume.router, history.router, preferences.router, preview.router, ai.router, generate.router, plans.router)
 for router in ROUTERS:
     app.include_router(router)
 

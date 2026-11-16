@@ -12,7 +12,7 @@ def tables(path):
 
 def test_database_created_on_startup(client):
     assert db.DB_PATH.exists()
-    assert tables(db.DB_PATH) == {"users", "baseline_resumes", "custom_resumes", "preferences"}
+    assert tables(db.DB_PATH) == {"users", "baseline_resumes", "custom_resumes", "generations", "preferences"}
 
 
 def test_init_adds_newer_columns_to_an_older_history_table(tmp_path, monkeypatch):

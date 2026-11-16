@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 
-import { type HistoryEntry, optimizationLabel, pdfUrl, toneLabel } from "@/lib/api";
+import { type HistoryEntry, optimizationLabel, PDF_PLAN_NOTE, pdfUrl, toneLabel } from "@/lib/api";
 
 import PanelTitle from "./PanelTitle";
 
@@ -22,7 +22,8 @@ export function historyDetails(entry: HistoryEntry): string[] {
   return details.filter((detail): detail is string => Boolean(detail));
 }
 
-type Props = { entries: HistoryEntry[]; onClear: () => void };
+/** canDownload is false when the plan has no PDF download: entries stay listed, re-download is disabled. */
+type Props = { entries: HistoryEntry[]; onClear: () => void; canDownload: boolean };
 
 export const CLEAR_CONFIRM = "Delete all download history? This cannot be undone.";
 
@@ -32,7 +33,7 @@ export const MAX_VISIBLE = 10;
 /** Past downloads, newest first: company, time, the generation settings (when recorded) and a re-download link.
  * "Clear history" asks for confirmation, then calls onClear. The list is as tall as its first
  * MAX_VISIBLE rows (measured, since rows can wrap) and scrolls beyond that. Starts expanded. */
-export default function HistoryPanel({ entries, onClear }: Props) {
+export default function HistoryPanel({ entries, onClear, canDownload }: Props) {
   const [open, setOpen] = useState(true);
   const list = useRef<HTMLUListElement>(null);
 
@@ -72,13 +73,19 @@ export default function HistoryPanel({ entries, onClear }: Props) {
                   ))}
                 </div>
               </div>
-              <a
-                href={pdfUrl(entry.id)}
-                aria-label={`Download ${entry.company} resume`}
-                className="text-primary hover:underline"
-              >
-                Download
-              </a>
+              {canDownload ? (
+                <a
+                  href={pdfUrl(entry.id)}
+                  aria-label={`Download ${entry.company} resume`}
+                  className="text-primary hover:underline"
+                >
+                  Download
+                </a>
+              ) : (
+                <span title={PDF_PLAN_NOTE} className="text-ink/40">
+                  Download
+                </span>
+              )}
             </li>
           ))}
         </ul>

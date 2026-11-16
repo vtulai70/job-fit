@@ -19,12 +19,21 @@ def auth_options() -> AuthenticateRequestOptions:
     )
 
 
-def current_user(request: Request) -> str:
-    """Return the Clerk user id from the __session cookie or Bearer token, or raise 401."""
+def session_claims(request: Request) -> dict:
+    """The verified session token claims from the __session cookie or Bearer token, or raise 401.
+    FastAPI resolves it once per request, so the user and plan dependencies share one verification."""
     state = authenticate_request(request, auth_options())
     if not state.is_signed_in:
         raise HTTPException(status_code=401, detail="Not signed in")
-    return state.payload["sub"]
+    return state.payload
+
+
+Claims = Annotated[dict, Depends(session_claims)]
+
+
+def current_user(claims: Claims) -> str:
+    """The Clerk user id."""
+    return claims["sub"]
 
 
 CurrentUser = Annotated[str, Depends(current_user)]

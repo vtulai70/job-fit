@@ -10,12 +10,20 @@ from app.ai import Model
 from app.auth import UserId
 from app.db import Db, now
 from app.pdf import render_pdf
+from app.plans import CurrentPlan, Plan
 from app.routes.preferences import GENERATION_FIELDS, GenerationSettings, Style
 
 router = APIRouter(prefix="/api/history")
 
 
 PRO_FIELDS = ("pro_judge_model", "pro_rank")
+PDF_LOCKED = "PDF download is available on the Basic and Pro plans. Upgrade under Plans."
+
+
+def require_pdf_download(plan: Plan) -> None:
+    """403 unless the plan includes PDF download (also after a downgrade, for past downloads)."""
+    if not plan.has("pdf_download"):
+        raise HTTPException(status_code=403, detail=PDF_LOCKED)
 
 
 class HistoryIn(GenerationSettings):
@@ -60,8 +68,9 @@ def list_history(user_id: UserId, db: Db) -> list[HistoryEntry]:
 
 
 @router.post("", status_code=201)
-def add_history(body: HistoryIn, user_id: UserId, db: Db) -> HistoryEntry:
-    """Record a download with the settings it was generated with."""
+def add_history(body: HistoryIn, user_id: UserId, db: Db, plan: CurrentPlan) -> HistoryEntry:
+    """Record a download with the settings it was generated with; needs PDF download on the plan."""
+    require_pdf_download(plan)
     row = {**body.model_dump(), "user_id": user_id, "downloaded_at": now()}
     cursor = db.execute(
         f"INSERT INTO custom_resumes ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})",
@@ -77,8 +86,9 @@ def clear_history(user_id: UserId, db: Db) -> None:
 
 
 @router.get("/{entry_id}/pdf")
-def history_pdf(entry_id: int, user_id: UserId, db: Db) -> Response:
-    """Render a past download as PDF."""
+def history_pdf(entry_id: int, user_id: UserId, db: Db, plan: CurrentPlan) -> Response:
+    """Render a past download as PDF; needs PDF download on the plan."""
+    require_pdf_download(plan)
     row = db.execute(
         "SELECT company, content_md, style FROM custom_resumes WHERE id = ? AND user_id = ?",
         (entry_id, user_id),

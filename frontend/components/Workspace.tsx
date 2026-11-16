@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/react";
 import { useEffect, useRef, useState } from "react";
 
 import * as api from "@/lib/api";
@@ -8,11 +9,19 @@ import ChatSidebar from "./ChatSidebar";
 import CustomResume, { type CustomResumeData } from "./CustomResume";
 import HistoryPanel from "./HistoryPanel";
 import JobDescription from "./JobDescription";
+import PlansDialog from "./PlansDialog";
 import PreferencesPanel from "./PreferencesPanel";
 import ResumePanel from "./ResumePanel";
 
 export const GENERATE_MESSAGE = "Please generate my custom resume for this job description.";
 export const CLEAR_FAILED = "Could not clear the download history. Please try again.";
+export const GENERATE_FAILED = "Sorry, something went wrong. Please try again.";
+
+/** The chat reply for a failed generation: the backend's reason when the plan blocked it (403, 429). */
+export function failureReply(error: unknown): string {
+  const blocked = error instanceof api.ApiError && (error.status === 403 || error.status === 429);
+  return (blocked && error.detail) || GENERATE_FAILED;
+}
 const UNKNOWN_COMPANY = "Unknown company";
 
 /** Chat note naming the settings the next prompt is generated with, one per line; Notes only when set.
@@ -85,13 +94,26 @@ export default function Workspace() {
   const [prefs, setPrefs] = useState<api.Preferences | null>(null);
   const [messages, setMessages] = useState<api.ChatEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  const [plan, setPlan] = useState<api.PlanInfo | null>(null);
+  const [plansOpen, setPlansOpen] = useState(false);
   const prefsSaved = useRef<Promise<unknown>>(Promise.resolve());
+  const { getToken } = useAuth();
+  const features = plan?.features ?? [];
+  const canDownload = features.includes("pdf_download");
 
   useEffect(() => {
     api.getBaseline().then((b) => setBaseline(b.content_md));
     api.listHistory().then(setHistory);
     api.getPreferences().then(setPrefs);
+    api.getPlan().then(setPlan);
   }, []);
+
+  /** After the pricing table closes: get a fresh session token (it carries the plan), then reload the plan. */
+  async function closePlans() {
+    setPlansOpen(false);
+    await getToken({ skipCache: true });
+    setPlan(await api.getPlan());
+  }
 
   async function uploadBaseline(content: string) {
     setBaseline((await api.putBaseline(content)).content_md);
@@ -129,10 +151,11 @@ export default function Workspace() {
       const failures = (result.pro?.failed ?? []).map((f): api.ChatEntry => ({ role: "info", content: failureNote(f) }));
       setMessages([...sent, ...failures, { role: "assistant", content: result.reply }]);
       if (result.resume_md) setGenerated(generatedFrom(result));
-    } catch {
-      setMessages([...sent, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
+    } catch (error) {
+      setMessages([...sent, { role: "assistant", content: failureReply(error) }]);
     } finally {
       setBusy(false);
+      api.getPlan().then(setPlan);
     }
   }
 
@@ -179,9 +202,10 @@ export default function Workspace() {
           onChange={editCustomResume}
           onStyleChange={(style) => savePreferences({ ...prefs!, style })}
           onDownload={downloadCustomResume}
+          canDownload={canDownload}
         />
-        {prefs && <PreferencesPanel prefs={prefs} onChange={savePreferences} />}
-        <HistoryPanel entries={history} onClear={clearHistory} />
+        {prefs && <PreferencesPanel prefs={prefs} features={features} onChange={savePreferences} />}
+        <HistoryPanel entries={history} onClear={clearHistory} canDownload={canDownload} />
       </main>
       <ChatSidebar
         messages={messages}
@@ -192,7 +216,10 @@ export default function Workspace() {
         onSend={send}
         onGenerate={() => send(GENERATE_MESSAGE)}
         onClear={() => setMessages([])}
+        usage={plan}
+        onPlans={() => setPlansOpen(true)}
       />
+      {plansOpen && <PlansDialog onClose={closePlans} />}
     </div>
   );
 }

@@ -346,13 +346,20 @@ Add subscription plans with Clerk Billing for individual users: a free plan and 
 - [x] Check the free default plan's key (`free`); create Basic (`basic`: `pdf_download`, $10/month, 1-day trial) and Pro (`pro`: `pdf_download`, `premium_models`, `pro_mode`, $30/month), publicly available (verified through the Backend API `GET /v1/billing/plans?payer_type=user`)
 
 **Substeps**
-- [ ] Backend entitlements: a `Plan` dependency built from the verified session token claims `pla` (e.g. `u:pro`, scope prefix removed; missing means `free`) and `fea` (comma-separated `u:feature` items); tests override it like `current_user`
-- [ ] Usage: `generations` table (user, timestamp, model, pro) with an index on (user, generated_at); a row is added when `/api/generate` returns a resume; `MONTHLY_GENERATIONS = {"free": 5, "basic": 50, "pro": 200}`; a Pro mode run adds one row per Pro model that returned a resume; `GET /api/plan` returns plan, features, used this month, limit and the reset date
-- [ ] Enforce in `/api/generate`: premium model without `premium_models` -> 403; Pro mode without `pro_mode` -> 403; limit reached -> 429 (checked before any AI call; for Pro mode the remaining allowance must cover every selected Pro model); premium models are `PREMIUM_MODELS` in `app/ai.py`, and in Pro mode the AI model and every Pro model are checked
-- [ ] Enforce in history: `POST /api/history` and `GET /api/history/{id}/pdf` need `pdf_download` (403)
-- [ ] Frontend plans: a "Plans" button in the header opening `<PricingTable />`; subscriptions are managed in the account menu's Billing tab (`UserProfile`); after checkout, refresh the session token and `/api/plan` so the new plan applies (verify how quickly the `pla`/`fea` claims update)
-- [ ] Frontend gating, via `useAuth().has({ feature })` and `/api/plan`: premium models and Pro mode disabled and marked "Pro plan"; Download PDF and history re-download disabled with "Basic or Pro plan"; a usage line in the chat sidebar ("3 of 5 resumes this month"); the chat shows the backend's message for 403/429 instead of the generic error
-- [ ] Docs: CLAUDE.md files, `docs/DATABASE.md`, `docs/schema.json`, README
+- [x] Backend entitlements: a `Plan` dependency built from the verified session token claims `pla` (e.g. `u:pro`, scope prefix removed; missing means `free`) and `fea` (comma-separated `u:feature` items); tests override it like `current_user`
+- [x] Usage: `generations` table (user, timestamp, model, pro) with an index on (user, generated_at); a row is added when `/api/generate` returns a resume; `MONTHLY_GENERATIONS = {"free": 5, "basic": 50, "pro": 200}`; a Pro mode run adds one row per Pro model that returned a resume; `GET /api/plan` returns plan, features, used this month, limit and the reset date
+- [x] Enforce in `/api/generate`: premium model without `premium_models` -> 403; Pro mode without `pro_mode` -> 403; limit reached -> 429 (checked before any AI call; for Pro mode the remaining allowance must cover every selected Pro model); premium models are `PREMIUM_MODELS` in `app/ai.py`, and in Pro mode the AI model and every Pro model are checked
+- [x] Enforce in history: `POST /api/history` and `GET /api/history/{id}/pdf` need `pdf_download` (403)
+- [x] Frontend plans: a "Plans" button in the header opening `<PricingTable />`; subscriptions are managed in the account menu's Billing tab (`UserProfile`); after checkout, refresh the session token and `/api/plan` so the new plan applies (verify how quickly the `pla`/`fea` claims update)
+- [x] Frontend gating, via `useAuth().has({ feature })` and `/api/plan`: premium models and Pro mode disabled and marked "Pro plan"; Download PDF and history re-download disabled with "Basic or Pro plan"; a usage line in the chat sidebar ("3 of 5 resumes this month"); the chat shows the backend's message for 403/429 instead of the generic error
+- [x] Docs: CLAUDE.md files, `docs/DATABASE.md`, `docs/schema.json`, README
+
+**Implementation notes**
+- The Plans button and usage line are at the top of the AI chat sidebar (not the header): the plan state lives in `Workspace`, next to the monthly limit it explains
+- Frontend gating uses the features from `GET /api/plan` (backend-verified) rather than `useAuth().has()`
+- Real tokens checked through the Backend API: a Free user has `pla: "u:free"` and no `fea`; a Pro user `pla: "u:pro"`, `fea: "u:pdf_download,u:premium_models,u:pro_mode"`
+- A checkout's Continue reloads the page, so the new plan applies at once (checked live by upgrading a test user from Basic to Pro); closing the Plans dialog also refreshes the session token and the plan
+- Upgrading from Free through the Backend API needs a payment method (`payment_method_required_for_transition`), so e2e test user Alice was subscribed to Pro through the real checkout with the test card (`global.setup.ts` redoes it if needed); Bob stays on Free. A third test user (`jobfit-e2e-carol+clerk_test@example.com`, Pro) was used once to check the upgrade flow and is not used by the tests
 
 **Tests**
 - Backend unit (plan overridden): claim parsing (`u:` prefix, missing claims), each 403 and 429 path (including a premium model used only as a Pro model, and a Pro run larger than the remaining allowance), usage counted only for resumes and once per Pro model that returned one, monthly reset boundary, `GET /api/plan`, history gating including re-download after a downgrade

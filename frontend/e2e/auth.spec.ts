@@ -56,5 +56,7 @@ test("two Clerk users do not see each other's data", async ({ page }) => {
   const history = page.getByRole("region", { name: "Download history" });
   await expect(history.getByText("No downloads yet.")).toBeVisible();
   const { id } = await created.json();
-  expect((await page.request.get(`/api/history/${id}/pdf`)).status()).toBe(404);
+  // Bob is on the Free plan, so PDFs are refused before the lookup (403); per-user PDF isolation
+  // between paid users is covered by backend/tests/test_access.py.
+  expect((await page.request.get(`/api/history/${id}/pdf`)).status()).toBe(403);
 });

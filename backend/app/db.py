@@ -42,6 +42,15 @@ CREATE TABLE IF NOT EXISTS custom_resumes (
 );
 CREATE INDEX IF NOT EXISTS idx_custom_resumes_user_downloaded
     ON custom_resumes (user_id, downloaded_at);
+CREATE TABLE IF NOT EXISTS generations (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    generated_at TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    pro          INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_generations_user_generated
+    ON generations (user_id, generated_at);
 CREATE TABLE IF NOT EXISTS preferences (
     user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     data       TEXT NOT NULL,

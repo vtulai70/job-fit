@@ -16,6 +16,8 @@ vi.mock("@clerk/react", () => ({
     (when === "signed-in") === clerk.signedIn ? children : null,
   SignIn: (props: { routing: string }) => <div data-testid="clerk-sign-in" data-routing={props.routing} />,
   UserButton: () => <button>User menu</button>,
+  useAuth: () => ({ getToken: async () => "token" }),
+  PricingTable: () => null,
 }));
 
 beforeEach(() => {

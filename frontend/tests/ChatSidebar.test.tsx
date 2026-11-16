@@ -14,6 +14,8 @@ function renderChat(overrides = {}) {
     onSend: vi.fn(),
     onGenerate: vi.fn(),
     onClear: vi.fn(),
+    usage: null,
+    onPlans: vi.fn(),
     ...overrides,
   };
   render(<ChatSidebar {...props} />);
@@ -92,7 +94,7 @@ test("before preferences load, generate and send are disabled", async () => {
 
 test("Clear conversation shows only with messages and is disabled while busy", async () => {
   const { unmount } = render(
-    <ChatSidebar messages={[]} busy={false} busyText="" ready canGenerate onSend={vi.fn()} onGenerate={vi.fn()} onClear={vi.fn()} />,
+    <ChatSidebar messages={[]} busy={false} busyText="" ready canGenerate onSend={vi.fn()} onGenerate={vi.fn()} onClear={vi.fn()} usage={null} onPlans={vi.fn()} />,
   );
   expect(screen.queryByRole("button", { name: "Clear conversation" })).not.toBeInTheDocument();
   unmount();
@@ -106,4 +108,17 @@ test("Clear conversation calls onClear", async () => {
   const props = renderChat({ messages: [{ role: "user", content: "hi" }] });
   await userEvent.click(screen.getByRole("button", { name: "Clear conversation" }));
   expect(props.onClear).toHaveBeenCalledOnce();
+});
+
+test("shows this month's usage and plan, and Plans opens the pricing table", async () => {
+  const usage = { plan: "free", features: [], limit: 5, used: 3, resets_at: "2026-12-01T00:00:00Z" };
+  const props = renderChat({ usage });
+  expect(screen.getByText("3 of 5 resumes this month · Free plan")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Plans" }));
+  expect(props.onPlans).toHaveBeenCalledOnce();
+});
+
+test("no usage line or Plans button before the plan loads", () => {
+  renderChat();
+  expect(screen.queryByRole("button", { name: "Plans" })).not.toBeInTheDocument();
 });

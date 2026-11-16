@@ -50,6 +50,20 @@
       ]
     },
     {
+      "name": "generations",
+      "description": "One row per resume produced, counted against the user's monthly plan limit (calendar month, UTC). A Pro mode run adds one row per candidate that returned a resume.",
+      "columns": [
+        { "name": "id", "type": "INTEGER", "constraints": ["PRIMARY KEY"] },
+        { "name": "user_id", "type": "INTEGER", "constraints": ["NOT NULL", "REFERENCES users(id) ON DELETE CASCADE"] },
+        { "name": "generated_at", "type": "TEXT", "constraints": ["NOT NULL"] },
+        { "name": "model", "type": "TEXT", "constraints": ["NOT NULL"], "description": "Model that wrote the resume" },
+        { "name": "pro", "type": "INTEGER", "constraints": ["NOT NULL"], "description": "1 for a Pro mode candidate, 0 otherwise" }
+      ],
+      "indexes": [
+        { "name": "idx_generations_user_generated", "columns": ["user_id", "generated_at"] }
+      ]
+    },
+    {
       "name": "preferences",
       "description": "User preferences as a JSON object (at most one row per user). Missing row means defaults.",
       "columns": [

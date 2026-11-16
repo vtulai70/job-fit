@@ -2,8 +2,9 @@
 
 import pytest
 
-from app import auth
+from app import auth, plans
 from app.main import app
+from tests.conftest import PRO
 
 SETTINGS = {
     "model": "openai/gpt-oss-120b", "optimization": "smart", "professional_years": 15, "earlier_years": 10,
@@ -20,6 +21,7 @@ PROTECTED = [
     ("GET", "/api/preferences", None),
     ("PUT", "/api/preferences", {"style": "modern"}),
     ("POST", "/api/preview", {"content_md": "x", "style": "modern"}),
+    ("GET", "/api/plan", None),
 ]
 
 
@@ -29,8 +31,9 @@ def test_requires_session(client, method, path, body):
 
 
 def act_as(username):
-    """Make requests run as the given Clerk user id, bypassing token verification."""
+    """Make requests run as the given Clerk user id on the Pro plan, bypassing token verification."""
     app.dependency_overrides[auth.current_user] = lambda: username
+    app.dependency_overrides[plans.current_plan] = lambda: PRO
 
 
 @pytest.fixture

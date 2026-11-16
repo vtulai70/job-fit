@@ -5,6 +5,7 @@ Customize a baseline resume for a specific job description with AI.
 ## Features
 
 - Sign in with Clerk; each user sees only their own data
+- Subscription plans with Clerk Billing: Free (5 resumes a month), Basic (50, PDF download), Pro (200, PDF download, premium models, Pro mode); usage and a Plans button in the chat sidebar
 - Upload a baseline resume (.md or .txt) and paste a job description
 - Chat with the AI in a sidebar; it may ask clarifying questions before generating. Before each prompt the chat shows the model, optimization level, tone and notes used
 - Pro mode: 2 to 4 models write the resume in parallel and the AI model judges and ranks them (score, strengths, weaknesses, rule violations); pick any candidate to edit and download
