@@ -7,6 +7,8 @@ import type { ChatEntry } from "@/lib/api";
 type Props = {
   messages: ChatEntry[];
   busy: boolean;
+  /** Shown while busy. */
+  busyText: string;
   /** False until preferences (and so the chosen model) have loaded. */
   ready: boolean;
   canGenerate: boolean;
@@ -15,7 +17,7 @@ type Props = {
 };
 
 /** AI chat: conversation, a one-click generate button and a free-text message box. */
-export default function ChatSidebar({ messages, busy, ready, canGenerate, onSend, onGenerate }: Props) {
+export default function ChatSidebar({ messages, busy, busyText, ready, canGenerate, onSend, onGenerate }: Props) {
   const [text, setText] = useState("");
 
   function submit(event: React.FormEvent) {
@@ -54,7 +56,7 @@ export default function ChatSidebar({ messages, busy, ready, canGenerate, onSend
             </div>
           ),
         )}
-        {busy && <p className="text-ink/60">Thinking...</p>}
+        {busy && <p className="text-ink/60">{busyText}</p>}
       </div>
       <form onSubmit={submit} className="mt-4 flex gap-2">
         <input

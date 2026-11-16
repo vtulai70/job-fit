@@ -17,8 +17,10 @@ Model = Literal[
     "anthropic/claude-sonnet-5.5",
     "openai/gpt-6-sol",
     "openai/gpt-5.4-nano",
-    "~google/gemini-pro-latest",
+    "google/gemini-3.8-flash",
+    "google/gemini-4-argon"
 ]
+
 MODEL: Model = "openai/gpt-oss-120b"
 
 router = APIRouter(prefix="/api/ai")

@@ -252,6 +252,7 @@ Now add support for multiple user accounts and authentication with Clerk. NEXT_P
 Add a "Pro mode" in which the baseline resume, job description and preferences go to several models in parallel, and another model (the judge) compares the resumes they return and picks the best fit for the job. The user can still view, edit and download any of the candidates.
 
 **Decisions**
+- Changed after implementation: there is no separate judge model setting; the AI model judges, and in Pro mode it cannot be one of the Pro models
 - 2 to 4 candidate models, chosen from the full model list (no restriction to cheaper models)
 - The judge model cannot also be a candidate (checked in the frontend and validated in the backend)
 - Pro starts automatically: with Pro mode on, a chat turn that produces a resume (including the one started by "Generate custom resume") runs Pro instead of a single generation
@@ -260,35 +261,35 @@ Add a "Pro mode" in which the baseline resume, job description and preferences g
 - Only the downloaded candidate is saved to the history. The others are discarded, keeping the "persisted on download" rule
 
 **Substeps**
-- [ ] Preferences:
+- [x] Preferences:
   - `pro_mode` (bool, default false)
   - `pro_models` (2-4 distinct `Model` values, default the first two other than the judge)
   - `judge_model` (`Model`, default `anthropic/claude-opus-5.5`, not in `pro_models`)
   - Older stored JSON loads with these defaults
-- [ ] Backend candidates:
+- [x] Backend candidates:
   - Run `ask_structured` for each Pro model in parallel with a `ThreadPoolExecutor`; the route is a sync `def`, so the existing client works as-is
   - Drop a candidate that errors, times out, or returns a null `resume_md`
-- [ ] Backend judge:
+- [x] Backend judge:
   - The prompt gets the baseline, the job description, the preferences and the labelled candidates
   - Structured output: `{ranking: [{label, score, strengths, weaknesses, rule_violations}], winner, rationale}`
   - `rule_violations` checks each candidate against the baseline and `docs/INSTRUCTIONS.md`: invented facts, new technologies, experience windows, graduation year, phone number
-- [ ] `POST /api/generate` keeps its request body:
+- [x] `POST /api/generate` keeps its request body:
   - With Pro off, or while the chat model is still asking questions, the response is unchanged
   - Once the resume is ready in Pro mode, the response adds `pro: {candidates: [{model, resume_md, score, strengths, weaknesses, rule_violations}], winner_model, rationale, judge_model}`, with candidates ordered by rank; `resume_md` and `company` are the winner's
   - With 1 candidate left there is no judge call and the response notes it; with 0, the request fails
-- [ ] History: add nullable columns `pro_judge_model` and `pro_rank`, filled when a Pro candidate is downloaded; `model` is the downloaded candidate's model
-- [ ] Preferences UI, in the Resume generation group:
+- [x] History: add nullable columns `pro_judge_model` and `pro_rank`, filled when a Pro candidate is downloaded; `model` is the downloaded candidate's model
+- [x] Preferences UI, in the Resume generation group:
   - A "Pro mode" checkbox
   - When it is on: a "Pro models" checklist that allows at most 4 and needs at least 2, and a "Judge model" dropdown that leaves out the selected Pro models
-- [ ] Chat:
+- [x] Chat:
   - The settings note adds `Pro models: <ids>` and `Judge: <id>`
   - The busy text reads "Generating N candidates, then comparing..."
   - The assistant reply summarizes the verdict (winner, score, one-line reason)
-- [ ] Custom resume panel:
+- [x] Custom resume panel:
   - One tab per candidate (model name and score, the winner marked, an issue count when there are rule violations); the winner is selected first
   - A collapsible "Why it won" section with the judge rationale, and the selected candidate's strengths, weaknesses and violations
   - Markdown/Preview, edits and Download apply to the selected tab, and edits are kept per tab
-- [ ] History UI: a "Pro: judged by <model>, rank <n>" label in the settings line
+- [x] History UI: a "Pro: judged by <model>, rank <n>" label in the settings line
 
 **Tests**
 - Backend unit (fake client):

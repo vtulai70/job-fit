@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 
-import { MODELS, type Model, OPTIMIZATION_LEVELS, type Optimization, type Preferences, type Style } from "@/lib/api";
+import {
+  MODELS,
+  type Model,
+  OPTIMIZATION_LEVELS,
+  type Optimization,
+  PRO_MAX_MODELS,
+  PRO_MIN_MODELS,
+  type Preferences,
+  type Style,
+} from "@/lib/api";
 
 import PanelTitle from "./PanelTitle";
 
@@ -14,6 +23,70 @@ const inputClass =
   "w-full rounded border border-line bg-canvas p-2 text-sm focus:border-primary focus:outline-none";
 
 const groupClass = "flex flex-col gap-3 border-t border-line pt-3";
+
+type ProProps = { prefs: Preferences; update: (change: Partial<Preferences>) => void };
+
+/** The Pro models without the AI model (which judges them), topped up to the minimum in `MODELS` order. */
+export function proModelsWithout(model: Model, proModels: Model[]): Model[] {
+  const kept = proModels.filter((m) => m !== model);
+  const extra = MODELS.filter((m) => m !== model && !kept.includes(m)).slice(0, Math.max(0, PRO_MIN_MODELS - kept.length));
+  return MODELS.filter((m) => kept.includes(m) || extra.includes(m));
+}
+
+/** Pro mode switch, then (when on) the candidate models. The AI model judges them, so the controls only allow
+ * valid choices: 2 to 4 candidates, never the AI model. */
+function ProModeFields({ prefs, update }: ProProps) {
+  const count = prefs.pro_models.length;
+
+  function toggle(model: Model, checked: boolean) {
+    update({ pro_models: MODELS.filter((m) => (m === model ? checked : prefs.pro_models.includes(m))) });
+  }
+
+  return (
+    <>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={prefs.pro_mode}
+          onChange={(e) =>
+            update({ pro_mode: e.target.checked, pro_models: proModelsWithout(prefs.model, prefs.pro_models) })
+          }
+          aria-describedby="pro-mode-description"
+          className="h-4 w-4 accent-primary"
+        />
+        Pro mode
+      </label>
+      <p id="pro-mode-description" className="-mt-2 text-xs text-ink/60">
+        The AI model above handles the chat. When it is ready to write the resume, the Pro models each write one and
+        the AI model judges and ranks them. Takes longer and costs more.
+      </p>
+      {prefs.pro_mode && (
+        <fieldset className="text-sm">
+          <legend>
+            Pro models ({PRO_MIN_MODELS}-{PRO_MAX_MODELS})
+          </legend>
+          {MODELS.map((model) => {
+            const checked = prefs.pro_models.includes(model);
+            const locked = model === prefs.model || (checked ? count <= PRO_MIN_MODELS : count >= PRO_MAX_MODELS);
+            return (
+              <label key={model} className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={locked}
+                  onChange={(e) => toggle(model, e.target.checked)}
+                  className="h-4 w-4 accent-primary disabled:opacity-40"
+                />
+                {model}
+                {model === prefs.model && " (AI model, judges)"}
+              </label>
+            );
+          })}
+        </fieldset>
+      )}
+    </>
+  );
+}
 
 /** Preferences in two groups, resume generation then PDF style; every change is reported to be saved.
  * Starts expanded. */
@@ -41,13 +114,14 @@ export default function PreferencesPanel({ initial, onChange }: Props) {
                 onChange={(e) => update({ model: e.target.value as Model })}
                 className={inputClass}
               >
-                {MODELS.map((model) => (
+                {MODELS.filter((model) => !prefs.pro_mode || !prefs.pro_models.includes(model)).map((model) => (
                   <option key={model} value={model}>
                     {model}
                   </option>
                 ))}
               </select>
             </label>
+            <ProModeFields prefs={prefs} update={update} />
             <label className="text-sm">
               Optimization level
               <select

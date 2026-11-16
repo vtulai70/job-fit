@@ -10,10 +10,15 @@ export const MODELS = [
   "anthropic/claude-sonnet-5.5",
   "openai/gpt-6-sol",
   "openai/gpt-5.4-nano",
-  "~google/gemini-pro-latest",
+  "google/gemini-3.8-flash",
+  "google/gemini-4-argon",
 ] as const;
 
 export type Model = (typeof MODELS)[number];
+
+/** Pro mode needs 2 to 4 candidate models (the backend validates the same limits). */
+export const PRO_MIN_MODELS = 2;
+export const PRO_MAX_MODELS = 4;
 
 /** How much the AI changes the resume; values match `Optimization` in the backend. */
 export const OPTIMIZATION_LEVELS = [
@@ -50,11 +55,13 @@ export type Preferences = {
   earlier_years: number;
   model: Model;
   optimization: Optimization;
+  pro_mode: boolean;
+  /** Candidate models in Pro mode; `model` judges them, so in Pro mode it is never one of them. */
+  pro_models: Model[];
 };
 
 export type Baseline = { content_md: string | null; updated_at: string | null };
 
-/** `model` and `optimization` are null for downloads saved before they were recorded. */
 /** The preferences that shape a generated resume; /api/generate returns them and each download saves them.
  * Keep in sync with `GenerationSettings` in `backend/app/routes/preferences.py`. */
 export const GENERATION_KEYS = [
@@ -76,20 +83,26 @@ export const generationSettings = (source: GenerationSettings) =>
 /** Tone as shown to the user: "no preference" when empty. */
 export const toneLabel = (tone: string) => tone.trim() || "no preference";
 
-/** A download; the generation settings are null for downloads saved before they were recorded. */
+/** Set when a download is a Pro candidate: the judge that ranked it and its rank (1 = best);
+ * both null when it was the only candidate, so nothing was judged. */
+export type ProFields = { pro_judge_model: Model | null; pro_rank: number | null };
+
+/** A download; the generation settings are null for downloads saved before they were recorded,
+ * the Pro fields for downloads that were not a judged Pro candidate. */
 export type HistoryEntry = {
   id: number;
   company: string;
   style: Style;
   downloaded_at: string;
-} & { [K in keyof GenerationSettings]: GenerationSettings[K] | null };
+} & { [K in keyof GenerationSettings]: GenerationSettings[K] | null } & ProFields;
 
 export type NewHistoryEntry = {
   company: string;
   job_description: string;
   content_md: string;
   style: Style;
-} & GenerationSettings;
+} & GenerationSettings &
+  Partial<ProFields>;
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(path, {
@@ -147,11 +160,31 @@ export type ChatEntry = ChatMessage | { role: "info"; content: string };
 
 export type GenerateRequest = { job_description: string; message: string; history: ChatMessage[] };
 
-/** The AI result plus the saved settings the backend generated with. */
+/** A resume a Pro model wrote, with the judge's review; score is null when nothing was compared. */
+export type ProCandidate = {
+  model: Model;
+  company: string | null;
+  resume_md: string;
+  score: number | null;
+  strengths: string;
+  weaknesses: string;
+  rule_violations: string[];
+};
+
+/** A Pro model that returned no valid resume, and why (e.g. "timed out after 300 s"). */
+export type ProFailure = { model: Model; reason: string };
+
+/** Pro candidates ranked best first (none when every Pro model failed); judge_model is null unless at least two
+ * were compared; failed lists the Pro models that were left out. */
+export type ProResult = { candidates: ProCandidate[]; rationale: string; judge_model: Model | null; failed: ProFailure[] };
+
+/** The AI result plus the saved settings the backend generated with. `pro` is set when Pro mode wrote the
+ * resume (`model` is then the chat model; each candidate names its own). */
 export type GenerateResult = {
   reply: string;
   company: string | null;
   resume_md: string | null;
+  pro: ProResult | null;
 } & GenerationSettings;
 
 export const generate = (req: GenerateRequest) => request<GenerateResult>("POST", "/api/generate", req);

@@ -2,8 +2,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
-import Workspace, { CLEAR_FAILED, GENERATE_MESSAGE, settingsNote } from "@/components/Workspace";
-import type { Preferences } from "@/lib/api";
+import Workspace, { busyText, CLEAR_FAILED, failureNote, GENERATE_MESSAGE, settingsNote } from "@/components/Workspace";
+import type { Preferences, ProFailure } from "@/lib/api";
 
 import { mockFetch } from "./fetchMock";
 
@@ -18,9 +18,11 @@ const PREFS: Preferences = {
   earlier_years: 10,
   model: "openai/gpt-oss-120b",
   optimization: "smart",
+  pro_mode: false,
+  pro_models: ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5"],
 };
 const HISTORY = [
-  { id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-oss-120b", optimization: "full", professional_years: 15, earlier_years: 10, max_pages: 2, tone: "concise", notes: "" },
+  { id: 1, company: "Acme", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-oss-120b", optimization: "full", professional_years: 15, earlier_years: 10, max_pages: 2, tone: "concise", notes: "", pro_judge_model: null, pro_rank: null },
 ];
 
 function mockData(baseline: string | null = "# Saved resume") {
@@ -95,6 +97,7 @@ const RESUME_RESULT = {
   max_pages: 2,
   tone: "concise",
   notes: "",
+  pro: null,
 };
 const QUESTION_RESULT = {
   reply: "Which team size should I emphasize?",
@@ -290,7 +293,7 @@ function mockHistoryPost(fetchMock: ReturnType<typeof mockData>) {
   const base = fetchMock.getMockImplementation()!;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
     url === "/api/history" && init?.method === "POST"
-      ? Response.json({ id: 9, company: "Initech", style: "modern", downloaded_at: "2026-11-11T12:00:00Z" })
+      ? Response.json({ ...HISTORY[0], id: 9, company: "Initech", downloaded_at: "2026-11-11T12:00:00Z" })
       : base(url, init),
   );
   vi.stubGlobal("location", { assign: vi.fn() });
@@ -494,4 +497,171 @@ test("history stays and the user is told when the server fails to clear it", asy
   await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
   await waitFor(() => expect(alert).toHaveBeenCalledWith(CLEAR_FAILED));
   expect(screen.getByRole("link", { name: "Download Acme resume" })).toBeInTheDocument();
+});
+
+const REVIEW = { strengths: "", weaknesses: "", rule_violations: [] as string[] };
+const PRO_RESULT = {
+  ...RESUME_RESULT,
+  reply: "anthropic/claude-sonnet-5.5 scored best (8.5/10). Strongest fit.",
+  company: "Initech",
+  resume_md: "# Sonnet resume",
+  pro: {
+    candidates: [
+      { model: "anthropic/claude-sonnet-5.5", company: "Initech", resume_md: "# Sonnet resume", score: 8.5, ...REVIEW, strengths: "Sharp summary" },
+      { model: "openai/gpt-6-sol", company: "Initech Inc.", resume_md: "# Sol resume", score: 7, ...REVIEW, weaknesses: "Long" },
+      { model: "openai/gpt-oss-120b", company: null, resume_md: "# Oss resume", score: 4, ...REVIEW, rule_violations: ["Adds Azure", "Invents a metric"] },
+    ],
+    rationale: "Strongest fit.",
+    judge_model: "anthropic/claude-opus-5.5",
+    failed: [] as { model: string; reason: string }[],
+  },
+};
+
+function tab(model: string) {
+  return screen.getByRole("tab", { name: new RegExp(`^${model.replace(/[.~/]/g, "\\$&")}`) });
+}
+
+test("a Pro result shows one tab per candidate with the best selected, and the judge's verdict", async () => {
+  mockChat({ body: PRO_RESULT });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  expect(await screen.findByText(PRO_RESULT.reply)).toBeInTheDocument();
+  expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+    "anthropic/claude-sonnet-5.5 · 8.5/10 · best",
+    "openai/gpt-6-sol · 7/10",
+    "openai/gpt-oss-120b · 4/10 · 2 issues",
+  ]);
+  expect(tab("anthropic/claude-sonnet-5.5")).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByLabelText("Custom resume content")).toHaveValue("# Sonnet resume");
+  expect(screen.getByText("Why it won (judged by anthropic/claude-opus-5.5)")).toBeInTheDocument();
+  expect(screen.getByText("Strongest fit.")).toBeInTheDocument();
+  expect(screen.getByText("Strengths: Sharp summary")).toBeInTheDocument();
+
+  await userEvent.click(tab("openai/gpt-oss-120b"));
+  expect(screen.getByLabelText("Custom resume content")).toHaveValue("# Oss resume");
+  expect(screen.getByRole("heading", { name: "Custom resume for Unknown company" })).toBeInTheDocument();
+  expect(screen.getByRole("list", { name: "Rule violations" })).toHaveTextContent("Adds AzureInvents a metric");
+});
+
+test("each Pro candidate keeps its own edits", async () => {
+  mockChat({ body: PRO_RESULT });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await userEvent.type(await screen.findByLabelText("Custom resume content"), " edited");
+  await userEvent.click(tab("openai/gpt-6-sol"));
+  expect(screen.getByLabelText("Custom resume content")).toHaveValue("# Sol resume");
+  await userEvent.type(screen.getByLabelText("Custom resume content"), " mine");
+  await userEvent.click(tab("anthropic/claude-sonnet-5.5"));
+  expect(screen.getByLabelText("Custom resume content")).toHaveValue("# Sonnet resume edited");
+  await userEvent.click(tab("openai/gpt-6-sol"));
+  expect(screen.getByLabelText("Custom resume content")).toHaveValue("# Sol resume mine");
+});
+
+test("downloading a Pro candidate records its model, company, judge and rank", async () => {
+  const fetchMock = mockChat({ body: PRO_RESULT });
+  mockHistoryPost(fetchMock);
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await screen.findByLabelText("Custom resume content");
+  await userEvent.click(tab("openai/gpt-6-sol"));
+  await userEvent.click(screen.getByRole("button", { name: "Download PDF" }));
+  await vi.waitFor(() =>
+    expect(postedHistory(fetchMock)).toMatchObject({
+      company: "Initech Inc.",
+      content_md: "# Sol resume",
+      model: "openai/gpt-6-sol",
+      optimization: "smart",
+      pro_judge_model: "anthropic/claude-opus-5.5",
+      pro_rank: 2,
+    }),
+  );
+});
+
+test("a single unjudged Pro candidate has no score or rank", async () => {
+  const [only] = PRO_RESULT.pro.candidates;
+  const unjudged = {
+    ...PRO_RESULT,
+    pro: { candidates: [{ ...only, score: null }], rationale: "Only one returned a resume.", judge_model: null, failed: [] },
+  };
+  const fetchMock = mockChat({ body: unjudged });
+  mockHistoryPost(fetchMock);
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  expect(await screen.findByRole("tab")).toHaveTextContent(/^anthropic\/claude-sonnet-5\.5$/);
+  expect(screen.getByText("Not compared")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Download PDF" }));
+  await vi.waitFor(() => expect(postedHistory(fetchMock)).toMatchObject({ pro_judge_model: null, pro_rank: null }));
+});
+
+test("a non-Pro result shows no candidate tabs", async () => {
+  mockChat({ body: RESUME_RESULT });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await screen.findByLabelText("Custom resume content");
+  expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+});
+
+test("in Pro mode the settings note marks the model as chat and judge and lists the Pro models", () => {
+  const pro: Preferences = { ...PREFS, pro_mode: true, pro_models: ["anthropic/claude-haiku-5.5", "openai/gpt-6-sol"] };
+  expect(settingsNote(pro).split("\n")).toEqual([
+    "Model: openai/gpt-oss-120b (chat and judge)",
+    "Optimization level: Smart integration",
+    "Tone: concise",
+    "Pro models: anthropic/claude-haiku-5.5, openai/gpt-6-sol",
+  ]);
+  expect(settingsNote(PREFS)).toBe(DEFAULT_NOTE);
+});
+
+test("busy text warns that Pro mode takes longer", () => {
+  expect(busyText(PREFS)).toBe("Thinking...");
+  expect(busyText(null)).toBe("Thinking...");
+  expect(busyText({ ...PREFS, pro_mode: true })).toBe(
+    "Thinking... If the resume is ready, 2 models write it and openai/gpt-oss-120b ranks them; this can take a few minutes.",
+  );
+});
+
+const TIMED_OUT: ProFailure = { model: "google/gemini-4-argon", reason: "timed out after 300 s" };
+const NO_RESUME: ProFailure = { model: "openai/gpt-5.4-nano", reason: "returned no resume" };
+
+test("failure note names the model and the reason", () => {
+  expect(failureNote(TIMED_OUT)).toBe(
+    "google/gemini-4-argon did not return a valid resume (timed out after 300 s), so it was left out.",
+  );
+});
+
+test("each Pro model without a valid resume gets a chat note before the reply, and notes are not sent to the AI", async () => {
+  const withFailures = { ...PRO_RESULT, pro: { ...PRO_RESULT.pro, failed: [TIMED_OUT, NO_RESUME] } };
+  const fetchMock = mockChat({ body: withFailures }, { body: QUESTION_RESULT });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await screen.findByText(PRO_RESULT.reply);
+  expect(chatLines().slice(-3)).toEqual([
+    failureNote(TIMED_OUT),
+    failureNote(NO_RESUME),
+    `AI: ${PRO_RESULT.reply}`,
+  ]);
+  expect(screen.getAllByRole("tab")).toHaveLength(3);
+
+  await userEvent.type(screen.getByLabelText("Message"), "Thanks{Enter}");
+  await screen.findByText(QUESTION_RESULT.reply);
+  expect(generateBodies(fetchMock)[1].history).toEqual([
+    { role: "user", content: GENERATE_MESSAGE },
+    { role: "assistant", content: PRO_RESULT.reply },
+  ]);
+});
+
+test("when every Pro model fails, the chat notes each one and no resume is shown", async () => {
+  const allFailed = {
+    ...PRO_RESULT,
+    reply: "No Pro model returned a resume. Please try again.",
+    resume_md: null,
+    pro: { candidates: [], rationale: "No Pro model returned a resume. Please try again.", judge_model: null, failed: [TIMED_OUT, NO_RESUME] },
+  };
+  mockChat({ body: allFailed });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  expect(await screen.findByText(allFailed.reply)).toBeInTheDocument();
+  expect(screen.getByText(failureNote(TIMED_OUT))).toBeInTheDocument();
+  expect(screen.getByText(failureNote(NO_RESUME))).toBeInTheDocument();
+  expect(screen.queryByLabelText("Custom resume content")).not.toBeInTheDocument();
 });

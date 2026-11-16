@@ -36,7 +36,9 @@ CREATE TABLE IF NOT EXISTS custom_resumes (
     earlier_years      INTEGER,
     max_pages          INTEGER,
     tone               TEXT,
-    notes              TEXT
+    notes              TEXT,
+    pro_judge_model    TEXT,
+    pro_rank           INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_custom_resumes_user_downloaded
     ON custom_resumes (user_id, downloaded_at);
@@ -57,6 +59,8 @@ ADDED_HISTORY_COLUMNS = {
     "max_pages": "INTEGER",
     "tone": "TEXT",
     "notes": "TEXT",
+    "pro_judge_model": "TEXT",
+    "pro_rank": "INTEGER",
 }
 
 

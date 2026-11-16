@@ -8,6 +8,7 @@ function renderChat(overrides = {}) {
   const props = {
     messages: [],
     busy: false,
+    busyText: "Thinking...",
     ready: true,
     canGenerate: true,
     onSend: vi.fn(),

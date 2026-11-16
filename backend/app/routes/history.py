@@ -4,8 +4,9 @@ import re
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from app.ai import Model
 from app.auth import UserId
 from app.db import Db, now
 from app.pdf import render_pdf
@@ -14,15 +15,23 @@ from app.routes.preferences import GENERATION_FIELDS, GenerationSettings, Style
 router = APIRouter(prefix="/api/history")
 
 
+PRO_FIELDS = ("pro_judge_model", "pro_rank")
+
+
 class HistoryIn(GenerationSettings):
+    """A download; the Pro fields are set when it is a judged Pro candidate (its rank, 1 = best)."""
+
     company: str
     job_description: str
     content_md: str
     style: Style
+    pro_judge_model: Model | None = None
+    pro_rank: int | None = Field(default=None, ge=1, le=4)
 
 
 class HistoryEntry(BaseModel):
-    """A download; the generation settings are None for rows saved before they were recorded."""
+    """A download; the generation settings are None for rows saved before they were recorded,
+    the Pro fields for downloads that were not a judged Pro candidate."""
 
     id: int
     company: str
@@ -35,13 +44,15 @@ class HistoryEntry(BaseModel):
     max_pages: int | None
     tone: str | None
     notes: str | None
+    pro_judge_model: str | None
+    pro_rank: int | None
 
 
 @router.get("")
 def list_history(user_id: UserId, db: Db) -> list[HistoryEntry]:
     """All downloads for the user, newest first."""
     rows = db.execute(
-        f"SELECT id, company, style, downloaded_at, {', '.join(GENERATION_FIELDS)} FROM custom_resumes WHERE user_id = ? "
+        f"SELECT id, company, style, downloaded_at, {', '.join(GENERATION_FIELDS + PRO_FIELDS)} FROM custom_resumes WHERE user_id = ? "
         "ORDER BY downloaded_at DESC, id DESC",
         (user_id,),
     ).fetchall()

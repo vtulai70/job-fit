@@ -2,7 +2,26 @@
 
 from app.routes.preferences import Preferences
 
-INSTRUCTIONS = """\
+RULES = """\
+- Show or hide years in the Education section exactly as the user preferences below say.
+- Change the resume only as much as the user's optimization level below says. Every level follows
+  all of these rules: tailoring never adds facts that are not in the baseline resume.
+- Do not add technologies, tools or programming languages that are not in the baseline resume, even
+  ones commonly used alongside them. Every tool you list must appear in the baseline. If the job asks
+  for one that is missing (e.g. Azure), emphasize the closest one the user has (e.g. AWS) and do not
+  mention the missing one anywhere in the resume, not even as "aligned", "familiar" or "transferable".
+- Include the contact details from the baseline resume, except the phone number when the user
+  preferences say to leave it out.
+- Organize experience into sections exactly as the user preferences below say. Never drop a role
+  that falls inside one of those windows.
+- Only include licenses and certifications relevant to the job description.
+- Follow the user's preferences below.
+- Do not invent experience entries: every role in the resume must be a role from the baseline resume,
+  with its original title, company and dates. Never merge, split or add roles.
+- Never invent employers, titles, dates, degrees, accomplishments or metrics.
+"""
+
+INSTRUCTIONS = f"""\
 # Role
 
 You are a skilled resume writer working inside the JobFit app.
@@ -25,23 +44,7 @@ Tailor the user's baseline resume to the target job description to maximize the 
 
 # Rules
 
-- Show or hide years in the Education section exactly as the user preferences below say.
-- Change the resume only as much as the user's optimization level below says. Every level follows
-  all of these rules: tailoring never adds facts that are not in the baseline resume.
-- Do not add technologies, tools or programming languages that are not in the baseline resume, even
-  ones commonly used alongside them. Every tool you list must appear in the baseline. If the job asks
-  for one that is missing (e.g. Azure), emphasize the closest one the user has (e.g. AWS) and do not
-  mention the missing one anywhere in the resume, not even as "aligned", "familiar" or "transferable".
-- Include the contact details from the baseline resume, except the phone number when the user
-  preferences say to leave it out.
-- Organize experience into sections exactly as the user preferences below say. Never drop a role
-  that falls inside one of those windows.
-- Only include licenses and certifications relevant to the job description.
-- Follow the user's preferences below.
-- Do not invent experience entries: every role in the resume must be a role from the baseline resume,
-  with its original title, company and dates. Never merge, split or add roles.
-- Never invent employers, titles, dates, degrees, accomplishments or metrics.
-
+{RULES}
 # Output
 
 Respond with JSON fields:
@@ -114,10 +117,9 @@ def experience_rules(prefs: Preferences, year: int) -> str:
     return "\n".join(rules)
 
 
-def build_system_prompt(baseline: str | None, job_description: str, prefs: Preferences, year: int) -> str:
-    """Instructions plus the user's baseline, target job and preferences, for the given current year."""
-    return f"""{INSTRUCTIONS}
-# User preferences
+def context(baseline: str | None, job_description: str, prefs: Preferences, year: int) -> str:
+    """The user's preferences, baseline resume and target job, for the given current year."""
+    return f"""# User preferences
 
 - Maximum length: {prefs.max_pages} pages
 - Tone: {prefs.tone or "no preference"}
@@ -136,3 +138,8 @@ def build_system_prompt(baseline: str | None, job_description: str, prefs: Prefe
 
 {job_description.strip() or "(not provided)"}
 """
+
+
+def build_system_prompt(baseline: str | None, job_description: str, prefs: Preferences, year: int) -> str:
+    """Instructions plus the user's baseline, target job and preferences, for the given current year."""
+    return f"{INSTRUCTIONS}\n{context(baseline, job_description, prefs, year)}"

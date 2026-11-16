@@ -41,7 +41,9 @@
         { "name": "earlier_years", "type": "INTEGER", "constraints": [], "description": "Earlier Experience years the resume was generated with; NULL for older rows" },
         { "name": "max_pages", "type": "INTEGER", "constraints": [], "description": "Max pages the resume was generated with; NULL for older rows" },
         { "name": "tone", "type": "TEXT", "constraints": [], "description": "Tone the resume was generated with (may be empty); NULL for older rows" },
-        { "name": "notes", "type": "TEXT", "constraints": [], "description": "Notes for the AI the resume was generated with (may be empty); NULL for older rows" }
+        { "name": "notes", "type": "TEXT", "constraints": [], "description": "Notes for the AI the resume was generated with (may be empty); NULL for older rows" },
+        { "name": "pro_judge_model", "type": "TEXT", "constraints": [], "description": "Judge model that ranked this Pro candidate; NULL when not a judged Pro candidate" },
+        { "name": "pro_rank", "type": "INTEGER", "constraints": [], "description": "Rank the judge gave this Pro candidate (1 = best, up to 4); NULL when not a judged Pro candidate" }
       ],
       "indexes": [
         { "name": "idx_custom_resumes_user_downloaded", "columns": ["user_id", "downloaded_at"] }
@@ -64,8 +66,10 @@
         "include_graduation_year": { "type": "boolean", "default": false, "description": "Keep the university graduation/completion year in the Education section" },
         "professional_years": { "type": "integer", "default": 15, "minimum": 1, "maximum": 50, "description": "Roles that ended within this many years go in Professional Experience (full detail)" },
         "earlier_years": { "type": "integer", "default": 10, "minimum": 0, "maximum": 50, "description": "Roles in the next this-many years go in Earlier Experience (one line each: role, company, years); older roles are left out; 0 = no Earlier Experience section" },
-        "model": { "type": "string", "enum": ["openai/gpt-oss-120b", "anthropic/claude-opus-5.5", "anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5", "openai/gpt-6-sol", "openai/gpt-5.4-nano", "~google/gemini-pro-latest"], "default": "openai/gpt-oss-120b", "description": "OpenRouter model used to generate the resume" },
-        "optimization": { "type": "string", "enum": ["light", "smart", "full"], "default": "smart", "description": "How much the AI changes the resume: Light polish, Smart integration, Full tailoring" }
+        "model": { "type": "string", "enum": ["openai/gpt-oss-120b", "anthropic/claude-opus-5.5", "anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5", "openai/gpt-6-sol", "openai/gpt-5.4-nano", "google/gemini-3.8-flash", "google/gemini-4-argon"], "default": "openai/gpt-oss-120b", "description": "OpenRouter model used to generate the resume" },
+        "optimization": { "type": "string", "enum": ["light", "smart", "full"], "default": "smart", "description": "How much the AI changes the resume: Light polish, Smart integration, Full tailoring" },
+        "pro_mode": { "type": "boolean", "default": false, "description": "Pro mode: the Pro models each write the resume and the AI model (model) judges and ranks them" },
+        "pro_models": { "type": "array", "items": { "type": "string", "enum": "same as model" }, "minItems": 2, "maxItems": 4, "uniqueItems": true, "default": ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5"], "description": "Pro mode candidate models; when pro_mode is on, never includes model (the judge)" }
       }
     }
   ]

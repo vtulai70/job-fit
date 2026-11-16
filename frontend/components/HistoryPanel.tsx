@@ -7,7 +7,7 @@ import { type HistoryEntry, optimizationLabel, pdfUrl, toneLabel } from "@/lib/a
 import PanelTitle from "./PanelTitle";
 
 /** The generation settings of a download as short labels; settings not recorded (null) are left out,
- * as are empty notes. */
+ * as are empty notes. A judged Pro candidate ends with its judge and rank. */
 export function historyDetails(entry: HistoryEntry): string[] {
   const details = [
     entry.model,
@@ -17,6 +17,7 @@ export function historyDetails(entry: HistoryEntry): string[] {
     entry.max_pages !== null && `Max pages: ${entry.max_pages}`,
     entry.tone !== null && `Tone: ${toneLabel(entry.tone)}`,
     entry.notes && `Notes: ${entry.notes.trim()}`,
+    entry.pro_judge_model && `Pro: judged by ${entry.pro_judge_model}, rank ${entry.pro_rank}`,
   ];
   return details.filter((detail): detail is string => Boolean(detail));
 }

@@ -188,3 +188,21 @@ def test_clear_history_deletes_all_entries(signed_in):
 
 def test_clear_empty_history(signed_in):
     assert signed_in.delete("/api/history").status_code == 204
+
+
+def test_history_saves_and_lists_the_pro_fields(signed_in):
+    pro = {"pro_judge_model": "anthropic/claude-opus-5.5", "pro_rank": 2}
+    saved = signed_in.post("/api/history", json={**ENTRY, **pro}).json()
+    listed = signed_in.get("/api/history").json()[0]
+    assert {k: saved[k] for k in pro} == {k: listed[k] for k in pro} == pro
+
+
+def test_history_pro_fields_default_to_none(signed_in):
+    signed_in.post("/api/history", json=ENTRY)
+    entry = signed_in.get("/api/history").json()[0]
+    assert (entry["pro_judge_model"], entry["pro_rank"]) == (None, None)
+
+
+@pytest.mark.parametrize("change", [{"pro_rank": 0}, {"pro_rank": 5}, {"pro_judge_model": "openai/gpt-4o"}])
+def test_history_rejects_bad_pro_fields(signed_in, change):
+    assert signed_in.post("/api/history", json={**ENTRY, **change}).status_code == 422

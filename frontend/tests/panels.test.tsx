@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
 import HistoryPanel, { CLEAR_CONFIRM, historyDetails } from "@/components/HistoryPanel";
-import PreferencesPanel from "@/components/PreferencesPanel";
+import PreferencesPanel, { proModelsWithout } from "@/components/PreferencesPanel";
 import type { Preferences } from "@/lib/api";
 
 const PREFS: Preferences = {
@@ -17,6 +17,8 @@ const PREFS: Preferences = {
   earlier_years: 10,
   model: "openai/gpt-oss-120b",
   optimization: "smart",
+  pro_mode: false,
+  pro_models: ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5"],
 };
 
 test("history shows empty state", () => {
@@ -25,7 +27,7 @@ test("history shows empty state", () => {
   expect(screen.queryByRole("button", { name: "Clear history" })).not.toBeInTheDocument();
 });
 
-const ENTRY = { id: 1, company: "Acme", style: "modern" as const, downloaded_at: "2026-11-10T10:00:00Z", model: null, optimization: null, professional_years: null, earlier_years: null, max_pages: null, tone: null, notes: null };
+const ENTRY = { id: 1, company: "Acme", style: "modern" as const, downloaded_at: "2026-11-10T10:00:00Z", model: null, optimization: null, professional_years: null, earlier_years: null, max_pages: null, tone: null, notes: null, pro_judge_model: null, pro_rank: null };
 
 test("clear history asks for confirmation, then calls onClear", async () => {
   const confirm = vi.fn().mockReturnValue(true);
@@ -50,8 +52,8 @@ test("history lists entries with re-download links", () => {
     <HistoryPanel
       onClear={vi.fn()}
       entries={[
-        { id: 2, company: "Beta", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-6-sol", optimization: "full", professional_years: 12, earlier_years: 0, max_pages: 3, tone: "", notes: "Lead with AI" },
-        { id: 1, company: "Acme", style: "classic", downloaded_at: "2026-11-10T10:00:00Z", model: null, optimization: null, professional_years: null, earlier_years: null, max_pages: null, tone: null, notes: null },
+        { id: 2, company: "Beta", style: "modern", downloaded_at: "2026-11-11T10:00:00Z", model: "openai/gpt-6-sol", optimization: "full", professional_years: 12, earlier_years: 0, max_pages: 3, tone: "", notes: "Lead with AI", pro_judge_model: null, pro_rank: null },
+        { id: 1, company: "Acme", style: "classic", downloaded_at: "2026-11-10T10:00:00Z", model: null, optimization: null, professional_years: null, earlier_years: null, max_pages: null, tone: null, notes: null, pro_judge_model: null, pro_rank: null },
       ]}
     />,
   );
@@ -104,16 +106,11 @@ test("every edit reports the full preferences", async () => {
   await userEvent.type(screen.getByLabelText("Tone"), "concise");
   await userEvent.type(screen.getByLabelText("Notes for the AI"), "Lead with AI");
   expect(onChange).toHaveBeenLastCalledWith({
+    ...PREFS,
     style: "classic",
     max_pages: 3,
     tone: "concise",
     notes: "Lead with AI",
-    include_phone: true,
-    include_graduation_year: false,
-    professional_years: 15,
-    earlier_years: 10,
-    model: "openai/gpt-oss-120b",
-    optimization: "smart",
   });
 });
 
@@ -182,7 +179,8 @@ const MODELS = [
   "anthropic/claude-sonnet-5.5",
   "openai/gpt-6-sol",
   "openai/gpt-5.4-nano",
-  "~google/gemini-pro-latest",
+  "google/gemini-3.8-flash",
+  "google/gemini-4-argon",
 ];
 
 test("model select lists every model, default first", () => {
@@ -320,4 +318,101 @@ test("history details list every recorded setting in order, notes only when set"
 
 test("history details are empty for downloads saved before settings were recorded", () => {
   expect(historyDetails(ENTRY)).toEqual([]);
+});
+
+function proCheckbox(model: string) {
+  return within(screen.getByRole("group", { name: "Pro models (2-4)" })).getByRole("checkbox", { name: new RegExp(`^${model.replace(/[.~/]/g, "\\$&")}`) });
+}
+
+function modelOptions() {
+  return within(screen.getByLabelText("AI model")).getAllByRole("option").map((o) => o.textContent);
+}
+
+test("Pro mode is off by default and turning it on shows the Pro models, with no judge setting", async () => {
+  const onChange = vi.fn();
+  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
+  const pro = screen.getByRole("checkbox", { name: "Pro mode" });
+  expect(pro).not.toBeChecked();
+  expect(screen.queryByRole("group", { name: "Pro models (2-4)" })).not.toBeInTheDocument();
+  await userEvent.click(pro);
+  expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, pro_mode: true });
+  expect(proCheckbox("anthropic/claude-haiku-5.5")).toBeChecked();
+  expect(proCheckbox("anthropic/claude-sonnet-5.5")).toBeChecked();
+  expect(screen.queryByLabelText(/judge model/i)).not.toBeInTheDocument();
+});
+
+test("in Pro mode the AI model judges: it is never a Pro model", () => {
+  render(<PreferencesPanel initial={{ ...PREFS, pro_mode: true }} onChange={vi.fn()} />);
+  expect(proCheckbox("openai/gpt-oss-120b")).toBeDisabled();
+  expect(proCheckbox("openai/gpt-oss-120b")).not.toBeChecked();
+  expect(proCheckbox("openai/gpt-oss-120b")).toHaveAccessibleName("openai/gpt-oss-120b (AI model, judges)");
+  expect(modelOptions()).not.toContain("anthropic/claude-haiku-5.5");
+  expect(modelOptions()).not.toContain("anthropic/claude-sonnet-5.5");
+  expect(modelOptions()).toHaveLength(MODELS.length - 2);
+});
+
+test("with Pro mode off every model can be the AI model", () => {
+  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  expect(modelOptions()).toHaveLength(MODELS.length);
+});
+
+test("turning Pro mode on drops the AI model from the Pro models and keeps at least 2", async () => {
+  const onChange = vi.fn();
+  const prefs = { ...PREFS, model: "anthropic/claude-haiku-5.5" as const };
+  render(<PreferencesPanel initial={prefs} onChange={onChange} />);
+  await userEvent.click(screen.getByRole("checkbox", { name: "Pro mode" }));
+  expect(onChange).toHaveBeenLastCalledWith({
+    ...prefs,
+    pro_mode: true,
+    pro_models: ["openai/gpt-oss-120b", "anthropic/claude-sonnet-5.5"],
+  });
+});
+
+test("proModelsWithout removes the AI model and tops up in model list order", () => {
+  expect(proModelsWithout("openai/gpt-6-sol", ["anthropic/claude-haiku-5.5", "openai/gpt-6-sol", "openai/gpt-5.4-nano"])).toEqual([
+    "anthropic/claude-haiku-5.5",
+    "openai/gpt-5.4-nano",
+  ]);
+  expect(proModelsWithout("openai/gpt-oss-120b", ["openai/gpt-oss-120b", "openai/gpt-6-sol"])).toEqual([
+    "anthropic/claude-opus-5.5",
+    "openai/gpt-6-sol",
+  ]);
+  expect(proModelsWithout("openai/gpt-oss-120b", ["anthropic/claude-haiku-5.5", "openai/gpt-6-sol"])).toEqual([
+    "anthropic/claude-haiku-5.5",
+    "openai/gpt-6-sol",
+  ]);
+});
+
+test("Pro models keep at least 2: the last two cannot be unchecked", async () => {
+  const onChange = vi.fn();
+  render(<PreferencesPanel initial={{ ...PREFS, pro_mode: true }} onChange={onChange} />);
+  expect(proCheckbox("anthropic/claude-haiku-5.5")).toBeDisabled();
+  await userEvent.click(proCheckbox("openai/gpt-6-sol"));
+  expect(onChange).toHaveBeenLastCalledWith({
+    ...PREFS,
+    pro_mode: true,
+    pro_models: ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5", "openai/gpt-6-sol"],
+  });
+  expect(proCheckbox("anthropic/claude-haiku-5.5")).toBeEnabled();
+  await userEvent.click(proCheckbox("anthropic/claude-haiku-5.5"));
+  expect(onChange).toHaveBeenLastCalledWith({
+    ...PREFS,
+    pro_mode: true,
+    pro_models: ["anthropic/claude-sonnet-5.5", "openai/gpt-6-sol"],
+  });
+});
+
+test("Pro models allow at most 4", () => {
+  const four = ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5", "openai/gpt-6-sol", "openai/gpt-5.4-nano"] as const;
+  render(<PreferencesPanel initial={{ ...PREFS, pro_mode: true, pro_models: [...four] }} onChange={vi.fn()} />);
+  for (const model of four) expect(proCheckbox(model)).toBeEnabled();
+  expect(proCheckbox("anthropic/claude-opus-5.5")).toBeDisabled();
+  expect(proCheckbox("google/gemini-4-argon")).toBeDisabled();
+});
+
+test("history details end with the judge and rank of a Pro download", () => {
+  expect(historyDetails({ ...RECORDED, pro_judge_model: "anthropic/claude-opus-5.5", pro_rank: 2 }).at(-1)).toBe(
+    "Pro: judged by anthropic/claude-opus-5.5, rank 2",
+  );
+  expect(historyDetails(RECORDED).join(" ")).not.toContain("Pro:");
 });

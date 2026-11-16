@@ -1,9 +1,10 @@
 """User preferences stored as a JSON object."""
 
-from typing import Literal
+import json
+from typing import Literal, get_args
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.ai import MODEL, Model
 from app.auth import UserId
@@ -13,6 +14,10 @@ router = APIRouter(prefix="/api/preferences")
 
 Style = Literal["professional", "modern", "classic"]
 Optimization = Literal["light", "smart", "full"]
+
+PRO_MIN_MODELS = 2
+PRO_MAX_MODELS = 4
+DEFAULT_PRO_MODELS: tuple[Model, ...] = ("anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5")
 
 
 class GenerationSettings(BaseModel):
@@ -41,6 +46,17 @@ class Preferences(BaseModel):
     earlier_years: int = Field(default=10, ge=0, le=50)
     model: Model = MODEL
     optimization: Optimization = "smart"
+    pro_mode: bool = False
+    pro_models: list[Model] = Field(default=list(DEFAULT_PRO_MODELS), min_length=PRO_MIN_MODELS, max_length=PRO_MAX_MODELS)
+
+    @model_validator(mode="after")
+    def check_pro_models(self) -> "Preferences":
+        """Pro candidates are distinct; in Pro mode the AI model, which judges them, is not one of them."""
+        if len(set(self.pro_models)) != len(self.pro_models):
+            raise ValueError("pro_models must be distinct")
+        if self.pro_mode and self.model in self.pro_models:
+            raise ValueError("in Pro mode the AI model judges and cannot be one of pro_models")
+        return self
 
 
 def generation_settings(prefs: Preferences) -> GenerationSettings:
@@ -48,10 +64,23 @@ def generation_settings(prefs: Preferences) -> GenerationSettings:
     return GenerationSettings(**prefs.model_dump(include=set(GENERATION_FIELDS)))
 
 
+def without_removed_models(data: dict) -> dict:
+    """Stored preferences with models no longer selectable replaced: the AI model by the default, and Pro
+    models dropped (with the AI model in Pro mode), topped up to the minimum in list order."""
+    models = get_args(Model)
+    model = data.get("model", MODEL) if data.get("model", MODEL) in models else MODEL
+    if "pro_models" not in data:
+        return {**data, "model": model}
+    excluded = {model} if data.get("pro_mode") else set()
+    kept = [m for m in data["pro_models"] if m in models and m not in excluded]
+    extra = [m for m in models if m not in kept and m != model][: max(0, PRO_MIN_MODELS - len(kept))]
+    return {**data, "model": model, "pro_models": [m for m in models if m in kept or m in extra]}
+
+
 def load_preferences(db: Db, user_id: int) -> Preferences:
-    """Stored preferences, or defaults when none are saved."""
+    """Stored preferences, or defaults when none are saved; models removed from the list since are replaced."""
     row = db.execute("SELECT data FROM preferences WHERE user_id = ?", (user_id,)).fetchone()
-    return Preferences.model_validate_json(row["data"]) if row else Preferences()
+    return Preferences.model_validate(without_removed_models(json.loads(row["data"]))) if row else Preferences()
 
 
 @router.get("")

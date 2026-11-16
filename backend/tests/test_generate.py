@@ -183,10 +183,10 @@ def test_generate_uses_default_model_when_none_saved(signed_in, use_ai):
 
 
 def test_generate_uses_saved_model(signed_in, use_ai):
-    signed_in.put("/api/preferences", json={"model": "~google/gemini-pro-latest"})
+    signed_in.put("/api/preferences", json={"model": "google/gemini-4-argon"})
     client = use_ai(RESUME_RESULT)
     signed_in.post("/api/generate", json={"job_description": "Job", "message": "go"})
-    assert client.chat.completions.parse.call_args.kwargs["model"] == "~google/gemini-pro-latest"
+    assert client.chat.completions.parse.call_args.kwargs["model"] == "google/gemini-4-argon"
 
 
 def test_generate_uses_stored_baseline_preferences_and_history(signed_in, use_ai):
@@ -204,7 +204,7 @@ def test_generate_uses_stored_baseline_preferences_and_history(signed_in, use_ai
     assert response.json() == {
         "reply": "Done", "company": "Initech", "experience_plan": [], "resume_md": "# Tailored",
         "model": "openai/gpt-oss-120b", "optimization": "smart", "professional_years": 15, "earlier_years": 10,
-        "max_pages": 2, "tone": "warm", "notes": "Mention mentoring",
+        "max_pages": 2, "tone": "warm", "notes": "Mention mentoring", "pro": None,
     }
     messages = sent_messages(client)
     system = messages[0]["content"]
