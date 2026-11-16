@@ -9,7 +9,7 @@ Customize a baseline resume for a specific job description with AI.
 - Upload a baseline resume (.md or .txt) and paste a job description
 - Chat with the AI in a sidebar; it may ask clarifying questions before generating. Before each prompt the chat shows the model, optimization level, tone and notes used
 - Pro mode: 2 to 4 models write the resume in parallel and the AI model judges and ranks them (score, strengths, weaknesses, rule violations); pick any candidate to edit and download
-- Preferences, saved automatically on change: AI model (OpenRouter), Pro mode (Pro models; the AI model judges), optimization level (Light polish, Smart integration, Full tailoring), Professional / Earlier Experience years, max pages, tone, notes for the AI, include phone number, include graduation year
+- Preferences, saved automatically on change: AI model (OpenRouter), Pro mode (Pro models; the AI model judges), optimization level (Light polish, Smart integration, Full tailoring), Professional / Earlier Experience years, max pages, tone, notes for the AI, include phone number, include graduation year, include volunteering (only when the job mentions it or work-life balance)
 - Edit the generated resume as Markdown, or toggle to a preview rendered like the PDF; the PDF style (professional, modern, classic) is picked in the resume header and saved
 - Download as PDF, named `Resume - <name> - <company>.pdf`
 - Download history with the generation settings of each download, PDF re-download and Clear history; scrolls past 10 entries

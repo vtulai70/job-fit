@@ -6,7 +6,7 @@ from app import db
 from app.routes.preferences import GENERATION_FIELDS, Preferences, generation_settings
 
 DEFAULTS = {"style": "professional", "tone": "", "max_pages": 2, "notes": "", "include_phone": True, "include_graduation_year": False,
-            "professional_years": 15, "earlier_years": 10, "model": "openai/gpt-oss-120b",
+            "include_volunteering": True, "professional_years": 15, "earlier_years": 10, "model": "openai/gpt-oss-120b",
             "optimization": "smart", "pro_mode": False,
             "pro_models": ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5"]}
 
@@ -19,7 +19,7 @@ def test_defaults_when_none_saved(signed_in):
 
 def test_put_then_get(signed_in):
     prefs = {"style": "modern", "tone": "concise", "max_pages": 1, "notes": "Highlight AI work", "include_phone": False,
-             "include_graduation_year": True, "professional_years": 12, "earlier_years": 0, "model": "anthropic/claude-sonnet-5.5",
+             "include_graduation_year": True, "include_volunteering": False, "professional_years": 12, "earlier_years": 0, "model": "anthropic/claude-sonnet-5.5",
              "optimization": "light", "pro_mode": True,
              "pro_models": ["openai/gpt-6-sol", "openai/gpt-5.4-nano", "google/gemini-4-argon"]}
     assert signed_in.put("/api/preferences", json=prefs).json() == prefs
@@ -225,3 +225,10 @@ def test_a_removed_ai_model_never_falls_back_onto_a_pro_model(signed_in):
 def test_saving_a_removed_model_is_still_rejected(signed_in):
     assert signed_in.put("/api/preferences", json={"model": REMOVED}).status_code == 422
     assert signed_in.put("/api/preferences", json={"pro_models": [REMOVED, "openai/gpt-6-sol"]}).status_code == 422
+
+
+def test_volunteering_can_be_excluded_and_included_again(signed_in):
+    signed_in.put("/api/preferences", json={"include_volunteering": False})
+    assert signed_in.get("/api/preferences").json()["include_volunteering"] is False
+    signed_in.put("/api/preferences", json={"include_volunteering": True})
+    assert signed_in.get("/api/preferences").json()["include_volunteering"] is True

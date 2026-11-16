@@ -15,6 +15,13 @@ RULES = """\
 - Organize experience into sections exactly as the user preferences below say. Never drop a role
   that falls inside one of those windows.
 - Only include licenses and certifications relevant to the job description.
+- Include or leave out the volunteering section exactly as the user preferences below say.
+- Keep the resume within the maximum length in the user preferences below: count the words and
+  non-blank lines before answering, and shorten (fewer and shorter bullets, fewer list lines, drop the
+  least relevant details) until it fits.
+- Whatever the length, the resume always starts with the person's name as a level-1 Markdown heading
+  ("# Name", as in the baseline), followed by the contact details, and always has an "## Education"
+  section. Shorten other sections instead.
 - Follow the user's preferences below.
 - Do not invent experience entries: every role in the resume must be a role from the baseline resume,
   with its original title, company and dates. Never merge, split or add roles.
@@ -39,7 +46,7 @@ Tailor the user's baseline resume to the target job description to maximize the 
    clarifying questions instead of generating. Do not ask more than once per conversation unless the
    user asks you to.
 4. Otherwise generate the custom resume at the user's optimization level (below): match the company
-   vibe, weave in the top keywords, and surface relevant competencies that are implied but not
+   vibe, weave in the top keywords and values, and surface relevant competencies that are implied but not
    explicit in the professional history, but only in the parts of the resume that level lets you change.
 
 # Rules
@@ -78,6 +85,11 @@ PRO_CHAT_INSTRUCTIONS = f"{HEAD}\n{PRO_CHAT_OUTPUT}"
 
 PHONE_INCLUDE = "include the phone number from the baseline resume in the contact details"
 PHONE_EXCLUDE = "do NOT include the phone number anywhere in the resume; keep the other contact details"
+VOLUNTEERING_IF_RELEVANT = (
+    "include the volunteering section from the baseline resume only if the job description specifically "
+    "mentions volunteering or work-life balance; otherwise leave it out entirely"
+)
+VOLUNTEERING_EXCLUDE = "do NOT include a volunteering section or any volunteering activity anywhere in the resume"
 GRADUATION_INCLUDE = "keep the graduation or completion year of each degree as in the baseline resume"
 GRADUATION_EXCLUDE = (
     "do NOT include any year in the Education section (graduation or completion). For example, "
@@ -88,8 +100,9 @@ GRADUATION_EXCLUDE = (
 OPTIMIZATION = {
     "light": (
         "Light polish. Add the job's key skills and requirements that the baseline supports to the summary "
-        "and skills sections only, and keep the original context intact: copy every work history bullet "
-        "word for word from the baseline, in its original order. Do not rephrase, merge or reorder them."
+        "and skills sections only, and keep the original context intact: copy the work history bullets word "
+        "for word from the baseline, in their original order. Do not rephrase, merge or reorder them. To fit "
+        "the maximum length you may leave out the least relevant bullets, but never shorten a bullet."
     ),
     "smart": (
         "Smart integration. Naturally integrate the job's key skills and requirements into the work history, "
@@ -101,6 +114,22 @@ OPTIMIZATION = {
         "of bullets within each role) to match exactly what the employer is looking for."
     ),
 }
+
+
+# Measured on generated resumes rendered by app/pdf.py (all three styles fit the same): the first page holds
+# about 180-220 words or 31 non-blank lines (it also has the name and contact details), each later page about
+# 350 words or 30 lines. Kept below those, so a resume within the budget fits. Models cannot judge PDF pages.
+FIRST_PAGE_WORDS, MORE_PAGE_WORDS, LINES_PER_PAGE = 160, 340, 28
+
+
+def length_rule(prefs: Preferences) -> str:
+    """The page limit as concrete word and line budgets."""
+    words = FIRST_PAGE_WORDS + MORE_PAGE_WORDS * (prefs.max_pages - 1)
+    lines = LINES_PER_PAGE * prefs.max_pages
+    return (
+        f"{prefs.max_pages} {'page' if prefs.max_pages == 1 else 'pages'} as a PDF, which means the resume has at most "
+        f"{words} words and at most {lines} non-blank lines in total"
+    )
 
 
 def experience_rules(prefs: Preferences, year: int) -> str:
@@ -139,11 +168,12 @@ def context(baseline: str | None, job_description: str, prefs: Preferences, year
     """The user's preferences, baseline resume and target job, for the given current year."""
     return f"""# User preferences
 
-- Maximum length: {prefs.max_pages} pages
+- Maximum length: {length_rule(prefs)}
 - Tone: {prefs.tone or "no preference"}
 - Notes: {prefs.notes or "none"}
 - Phone number: {PHONE_INCLUDE if prefs.include_phone else PHONE_EXCLUDE}
 - Graduation year: {GRADUATION_INCLUDE if prefs.include_graduation_year else GRADUATION_EXCLUDE}
+- Volunteering: {VOLUNTEERING_IF_RELEVANT if prefs.include_volunteering else VOLUNTEERING_EXCLUDE}
 - Optimization level: {OPTIMIZATION[prefs.optimization]}
 - Experience (the current year is {year}; place each role by its end year):
 {experience_rules(prefs, year)}

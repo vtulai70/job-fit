@@ -215,6 +215,15 @@ export default function PreferencesPanel({ prefs, features, onChange }: Props) {
               />
               Include university graduation year in generated resume
             </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={prefs.include_volunteering}
+                onChange={(e) => update({ include_volunteering: e.target.checked })}
+                className="h-4 w-4 accent-primary"
+              />
+              Include volunteering when the job mentions volunteering or work-life balance
+            </label>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <label>

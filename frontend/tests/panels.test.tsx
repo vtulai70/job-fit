@@ -39,6 +39,7 @@ const PREFS: Preferences = {
   notes: "",
   include_phone: true,
   include_graduation_year: false,
+  include_volunteering: true,
   professional_years: 15,
   earlier_years: 10,
   model: "openai/gpt-oss-120b",
@@ -153,6 +154,7 @@ test("unchecking the phone option saves include_phone false", async () => {
 });
 
 const GRADUATION = "Include university graduation year in generated resume";
+const VOLUNTEERING = "Include volunteering when the job mentions volunteering or work-life balance";
 
 test("graduation year checkbox is off by default and reflects the saved preference", () => {
   const { unmount } = render(<Stateful initial={PREFS} onChange={vi.fn()} />);
@@ -457,6 +459,7 @@ test("preferences are ordered: model, Pro, optimization, tone, notes, experience
     "Earlier Experience (years)",
     "Include phone number in generated resume",
     GRADUATION,
+    VOLUNTEERING,
     "Max pages",
   ]);
 });
@@ -497,4 +500,13 @@ test("without premium models, premium Pro models cannot be added but can be remo
   expect(proCheckbox("openai/gpt-6-sol")).toHaveAccessibleName("openai/gpt-6-sol (Pro plan)");
   expect(proCheckbox("anthropic/claude-sonnet-5.5")).toBeEnabled();
   expect(proCheckbox("google/gemini-3.8-flash")).toBeEnabled();
+});
+
+test("volunteering is on by default and can be turned off", async () => {
+  const onChange = vi.fn();
+  render(<Stateful initial={PREFS} onChange={onChange} />);
+  const volunteering = screen.getByRole("checkbox", { name: VOLUNTEERING });
+  expect(volunteering).toBeChecked();
+  await userEvent.click(volunteering);
+  expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, include_volunteering: false });
 });

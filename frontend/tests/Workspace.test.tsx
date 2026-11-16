@@ -37,6 +37,7 @@ const PREFS: Preferences = {
   notes: "",
   include_phone: true,
   include_graduation_year: false,
+  include_volunteering: true,
   professional_years: 15,
   earlier_years: 10,
   model: "openai/gpt-oss-120b",

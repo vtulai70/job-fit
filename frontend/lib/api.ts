@@ -74,6 +74,8 @@ export type Preferences = {
   notes: string;
   include_phone: boolean;
   include_graduation_year: boolean;
+  /** Volunteering only when the job mentions volunteering or work-life balance; off: never. */
+  include_volunteering: boolean;
   professional_years: number;
   earlier_years: number;
   model: Model;

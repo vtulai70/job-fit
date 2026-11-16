@@ -11,7 +11,14 @@ from app.main import app
 from datetime import date
 from typing import get_args
 
-from app.prompt import OPTIMIZATION, build_system_prompt, experience_rules
+from app.prompt import (
+    OPTIMIZATION,
+    VOLUNTEERING_EXCLUDE,
+    VOLUNTEERING_IF_RELEVANT,
+    build_system_prompt,
+    experience_rules,
+    length_rule,
+)
 from app.routes.generate import ChatMessage, GenerateResult, build_messages
 from app.routes.preferences import Optimization, Preferences
 
@@ -53,7 +60,7 @@ QUESTION_RESULT = GenerateResult(
 def test_system_prompt_contains_inputs_and_rules():
     prefs = Preferences(style="modern", tone="concise", max_pages=1, notes="Lead with AI")
     prompt = build_system_prompt("# My resume", "Job at Acme", prefs, 2026)
-    for text in ["# My resume", "Job at Acme", "1 pages", "concise", "Lead with AI", "graduation"]:
+    for text in ["# My resume", "Job at Acme", "1 page as a PDF", "concise", "Lead with AI", "graduation"]:
         assert text in prompt
 
 
@@ -345,9 +352,21 @@ def core_bullets() -> list[str]:
     return re.findall(r"^- (.+)$", "".join(history.split("\n### ")[1:3]), re.M)
 
 
+def baseline_bullets() -> set[str]:
+    """Every work history bullet of the baseline, normalized."""
+    history = RESUME.split("## Professional History")[1].split("## Education")[0]
+    return {same_text(b) for b in re.findall(r"^- (.+)$", history, re.M)}
+
+
+def written_bullets(md: str) -> list[str]:
+    """The bullets of the generated Professional Experience section, normalized."""
+    return [same_text(b) for b in re.findall(r"^\s*[-*] (.+)$", section(md, "Professional Experience"), re.M)]
+
+
 def same_text(text: str) -> str:
-    """Text compared regardless of hyphen/dash variants (models swap in non-breaking hyphens) and spacing."""
-    return " ".join(re.sub(r"[\u2010-\u2015\u2212-]", "-", text).split())
+    """The words of a text, ignoring punctuation and spacing: models change typography (non-breaking hyphens,
+    "blue-green" for "blue green", "40 %" for "40%") without rephrasing."""
+    return " ".join(re.findall(r"\w+", text))
 
 
 @pytest.mark.integration
@@ -363,7 +382,9 @@ def test_real_generation_follows_optimization_level(level):
     assert not re.search(r"(19|20)\d\d", education_section(result.resume_md))
     kept = sum(same_text(b) in same_text(result.resume_md) for b in core_bullets())
     if level == "light":
-        assert kept == len(core_bullets())
+        written = written_bullets(result.resume_md)
+        assert written and all(b in baseline_bullets() for b in written), set(written) - baseline_bullets()
+        assert kept >= len(core_bullets()) // 2
     else:
         assert kept < len(core_bullets())
 
@@ -425,3 +446,82 @@ def test_real_generation_with_each_model(model):
     assert section(md, "Earlier Experience") == ""
     assert "Nokia" not in md
     assert PHONE_DIGITS not in digits(md)
+
+
+def test_system_prompt_includes_volunteering_only_when_relevant_by_default():
+    prompt = build_system_prompt("# Me", "Job", Preferences(), 2026)
+    assert f"- Volunteering: {VOLUNTEERING_IF_RELEVANT}" in prompt
+    assert VOLUNTEERING_EXCLUDE not in prompt
+    assert "Include or leave out the volunteering section exactly as the user preferences below say." in prompt
+
+
+def test_system_prompt_excludes_volunteering_when_turned_off():
+    prompt = build_system_prompt("# Me", "Job", Preferences(include_volunteering=False), 2026)
+    assert f"- Volunteering: {VOLUNTEERING_EXCLUDE}" in prompt
+    assert VOLUNTEERING_IF_RELEVANT not in prompt
+
+
+@pytest.mark.parametrize("include,expected", [(True, VOLUNTEERING_IF_RELEVANT), (False, VOLUNTEERING_EXCLUDE)])
+def test_generate_sends_stored_volunteering_preference(signed_in, use_ai, include, expected):
+    signed_in.put("/api/preferences", json={"include_volunteering": include})
+    client = use_ai(RESUME_RESULT)
+    signed_in.post("/api/generate", json={"job_description": "Director at Initech", "message": "go"})
+    assert f"Volunteering: {expected}" in sent_messages(client)[0]["content"]
+
+
+def test_system_prompt_has_the_page_rules():
+    prompt = build_system_prompt("# Me", "Job", Preferences(max_pages=1), 2026)
+    assert "Keep the resume within the maximum length in the user preferences below" in prompt
+    assert "- Maximum length: 1 page as a PDF, which means the resume has at most 160 words and at most 28 non-blank lines" in prompt
+
+
+@pytest.mark.parametrize("pages,words,lines", [(1, 160, 28), (2, 500, 56), (3, 840, 84)])
+def test_page_limit_becomes_a_word_and_line_budget(pages, words, lines):
+    rule = length_rule(Preferences(max_pages=pages))
+    assert f"at most {words} words and at most {lines} non-blank lines" in rule
+
+
+def pdf_pages(md: str) -> int:
+    """Pages of the resume as the PDF renders it (professional style)."""
+    from weasyprint import HTML
+
+    from app.pdf import render_html
+
+    return len(HTML(string=render_html(md, "professional")).render().pages)
+
+
+def real_resume(job: str, prefs: Preferences = Preferences()) -> str:
+    system = build_system_prompt(RESUME, job, prefs, 2026)
+    message = "Generate my custom resume now. Do not ask questions."
+    result = ai.ask_structured(ai.get_client(), build_messages(system, [], message), GenerateResult, prefs.model)
+    assert result.resume_md
+    return result.resume_md
+
+
+@pytest.mark.integration
+def test_real_generation_leaves_out_volunteering_unless_the_job_mentions_it():
+    md = real_resume(JOB)
+    assert section(md, "Volunteering") == ""
+    assert "Reef" not in md and "Sea Turtle" not in md
+
+
+WORK_LIFE_JOB = JOB + "\nWe offer flexible hours and a strong work-life balance, with paid volunteer days."
+
+
+@pytest.mark.integration
+def test_real_generation_keeps_volunteering_when_the_job_mentions_work_life_balance():
+    md = real_resume(WORK_LIFE_JOB)
+    assert "Reef" in section(md, "Volunteering")
+
+
+@pytest.mark.integration
+def test_real_generation_leaves_out_volunteering_when_turned_off_even_if_the_job_mentions_it():
+    md = real_resume(WORK_LIFE_JOB, Preferences(include_volunteering=False))
+    assert section(md, "Volunteering") == ""
+    assert "Reef" not in md and "Sea Turtle" not in md
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("max_pages", [1, 2])
+def test_real_generation_stays_within_max_pages(max_pages):
+    assert pdf_pages(real_resume(JOB, Preferences(max_pages=max_pages))) <= max_pages

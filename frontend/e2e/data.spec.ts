@@ -74,6 +74,9 @@ test("preferences persist across reload", async ({ page }) => {
   const graduation = page.getByRole("checkbox", { name: "Include university graduation year in generated resume" });
   await expect(graduation).not.toBeChecked();
   await graduation.check();
+  const volunteering = page.getByRole("checkbox", { name: "Include volunteering when the job mentions volunteering or work-life balance" });
+  await expect(volunteering).toBeChecked();
+  await volunteering.uncheck();
   await expect(page.getByLabel("Professional Experience (years)")).toHaveValue("15");
   await expect(page.getByLabel("Earlier Experience (years)")).toHaveValue("10");
   await page.getByLabel("Professional Experience (years)").fill("12");
@@ -90,6 +93,9 @@ test("preferences persist across reload", async ({ page }) => {
   await expect(page.getByLabel("Notes for the AI")).toHaveValue("Emphasize AI adoption");
   await expect(page.getByRole("checkbox", { name: "Include phone number in generated resume" })).not.toBeChecked();
   await expect(page.getByRole("checkbox", { name: "Include university graduation year in generated resume" })).toBeChecked();
+  await expect(
+    page.getByRole("checkbox", { name: "Include volunteering when the job mentions volunteering or work-life balance" }),
+  ).not.toBeChecked();
   await expect(page.getByLabel("Professional Experience (years)")).toHaveValue("12");
   await expect(page.getByLabel("Earlier Experience (years)")).toHaveValue("6");
   await expect(page.getByLabel("AI model")).toHaveValue("anthropic/claude-sonnet-5.5");

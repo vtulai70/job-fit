@@ -18,7 +18,7 @@ vi.mock("@clerk/react", () => ({
 const FREE: PlanInfo = { plan: "free", features: [], limit: 5, used: 2, resets_at: "2026-12-01T00:00:00Z" };
 const PRO: PlanInfo = { plan: "pro", features: ["pdf_download", "premium_models", "pro_mode"], limit: 200, used: 0, resets_at: "2026-12-01T00:00:00Z" };
 const PREFS = {
-  style: "modern", tone: "", max_pages: 2, notes: "", include_phone: true, include_graduation_year: false,
+  style: "modern", tone: "", max_pages: 2, notes: "", include_phone: true, include_graduation_year: false, include_volunteering: true,
   professional_years: 15, earlier_years: 10, model: "openai/gpt-oss-120b", optimization: "smart", pro_mode: false,
   pro_models: ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5"],
 };
