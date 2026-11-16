@@ -62,7 +62,8 @@ test("baseline starts collapsed once saved; panels expand and collapse", async (
 
 test("preferences persist across reload", async ({ page }) => {
   await signIn(page);
-  await page.getByLabel("PDF style").selectOption("classic");
+  await expect(page.getByLabel("PDF style")).toHaveCount(0);
+  await expect(page.getByText("Resume generation")).toHaveCount(0);
   await page.getByLabel("Tone").fill("concise, metrics-driven");
   await page.getByLabel("Notes for the AI").fill("Emphasize AI adoption");
   await expect(page.getByLabel("Optimization level")).toHaveValue("smart");
@@ -85,7 +86,6 @@ test("preferences persist across reload", async ({ page }) => {
   expect((await lastSave).ok()).toBe(true);
 
   await page.reload();
-  await expect(page.getByLabel("PDF style")).toHaveValue("classic");
   await expect(page.getByLabel("Tone")).toHaveValue("concise, metrics-driven");
   await expect(page.getByLabel("Notes for the AI")).toHaveValue("Emphasize AI adoption");
   await expect(page.getByRole("checkbox", { name: "Include phone number in generated resume" })).not.toBeChecked();

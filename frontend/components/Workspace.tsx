@@ -177,10 +177,11 @@ export default function Workspace() {
           style={prefs?.style ?? "professional"}
           renderPreview={api.previewHtml}
           onChange={editCustomResume}
+          onStyleChange={(style) => savePreferences({ ...prefs!, style })}
           onDownload={downloadCustomResume}
         />
         <HistoryPanel entries={history} onClear={clearHistory} />
-        {prefs && <PreferencesPanel initial={prefs} onChange={savePreferences} />}
+        {prefs && <PreferencesPanel prefs={prefs} onChange={savePreferences} />}
       </main>
       <ChatSidebar
         messages={messages}

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
@@ -61,7 +61,7 @@ const SETTINGS = {
   tone: "",
   notes: "",
 } as const;
-const PREVIEW = { style: "modern" as const, renderPreview: vi.fn() };
+const PREVIEW = { style: "modern" as const, renderPreview: vi.fn(), onStyleChange: vi.fn() };
 
 test("custom resume shows placeholder and no download when empty", () => {
   render(<CustomResume {...PREVIEW} resume={null} onChange={vi.fn()} onDownload={vi.fn()} />);
@@ -111,6 +111,7 @@ test("preview mode renders the resume in the PDF style and toggles back to the e
       resume={{ company: "Acme", content_md: "# Tailored", settings: SETTINGS }}
       style="classic"
       renderPreview={renderPreview}
+      onStyleChange={vi.fn()}
       onChange={vi.fn()}
       onDownload={vi.fn()}
     />,
@@ -131,7 +132,7 @@ test("preview mode renders the resume in the PDF style and toggles back to the e
 
 test("preview re-renders when the resume or style changes", async () => {
   const renderPreview = vi.fn(async (md: string, style: string) => `${style}:${md}`);
-  const props = { renderPreview, onChange: vi.fn(), onDownload: vi.fn() };
+  const props = { renderPreview, onChange: vi.fn(), onStyleChange: vi.fn(), onDownload: vi.fn() };
   const { rerender } = render(<CustomResume {...props} style="modern" resume={{ company: "A", content_md: "# One", settings: SETTINGS }} />);
   await userEvent.click(screen.getByRole("button", { name: "Preview" }));
   await vi.waitFor(() => expect(previewTitle()).toHaveAttribute("srcdoc", "modern:# One"));
@@ -139,4 +140,30 @@ test("preview re-renders when the resume or style changes", async () => {
   await vi.waitFor(() => expect(previewTitle()).toHaveAttribute("srcdoc", "modern:# Two"));
   rerender(<CustomResume {...props} style="classic" resume={{ company: "A", content_md: "# Two", settings: SETTINGS }} />);
   await vi.waitFor(() => expect(previewTitle()).toHaveAttribute("srcdoc", "classic:# Two"));
+});
+
+test("the PDF style select sits left of the Markdown / Preview toggle and reports changes", async () => {
+  const onStyleChange = vi.fn();
+  render(
+    <CustomResume
+      {...PREVIEW}
+      style="modern"
+      onStyleChange={onStyleChange}
+      resume={{ company: "Acme", content_md: "# Tailored", settings: SETTINGS }}
+      onChange={vi.fn()}
+      onDownload={vi.fn()}
+    />,
+  );
+  const style = screen.getByLabelText("PDF style");
+  expect(style).toHaveValue("modern");
+  expect(within(style).getAllByRole("option").map((o) => o.textContent)).toEqual(["professional", "modern", "classic"]);
+  const markdown = screen.getByRole("button", { name: "Markdown" });
+  expect(style.compareDocumentPosition(markdown) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  await userEvent.selectOptions(style, "classic");
+  expect(onStyleChange).toHaveBeenCalledWith("classic");
+});
+
+test("no PDF style select before a resume is generated", () => {
+  render(<CustomResume {...PREVIEW} resume={null} onChange={vi.fn()} onDownload={vi.fn()} />);
+  expect(screen.queryByLabelText("PDF style")).not.toBeInTheDocument();
 });

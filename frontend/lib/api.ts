@@ -1,6 +1,9 @@
 /** Typed calls to the backend data routes. Session cookie is sent automatically (same origin). */
 
-export type Style = "professional" | "modern" | "classic";
+/** PDF styles, as `Style` in the backend; the first is the default. */
+export const STYLES = ["professional", "modern", "classic"] as const;
+
+export type Style = (typeof STYLES)[number];
 
 /** Models the user can pick; the backend validates against the same list. First is the default. */
 export const MODELS = [

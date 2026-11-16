@@ -1,10 +1,25 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { expect, test, vi } from "vitest";
 
 import HistoryPanel, { CLEAR_CONFIRM, historyDetails } from "@/components/HistoryPanel";
 import PreferencesPanel, { proModelsWithout } from "@/components/PreferencesPanel";
 import type { Preferences } from "@/lib/api";
+
+/** The panel with its preferences held in state, as Workspace does. */
+function Stateful({ initial, onChange }: { initial: Preferences; onChange: (prefs: Preferences) => void }) {
+  const [prefs, setPrefs] = useState(initial);
+  return (
+    <PreferencesPanel
+      prefs={prefs}
+      onChange={(next) => {
+        setPrefs(next);
+        onChange(next);
+      }}
+    />
+  );
+}
 
 const PREFS: Preferences = {
   style: "professional",
@@ -74,12 +89,12 @@ test("history lists entries with re-download links", () => {
 });
 
 test("preferences have no save button", () => {
-  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  render(<Stateful initial={PREFS} onChange={vi.fn()} />);
   expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Preferences"]);
 });
 
 test("preferences start expanded and collapse, keeping edited values", async () => {
-  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  render(<Stateful initial={PREFS} onChange={vi.fn()} />);
   const toggle = screen.getByRole("button", { name: "Preferences" });
   expect(toggle).toHaveAttribute("aria-expanded", "true");
   await userEvent.type(screen.getByLabelText("Tone"), "bold");
@@ -91,23 +106,20 @@ test("preferences start expanded and collapse, keeping edited values", async () 
 });
 
 test("preferences form shows initial values", () => {
-  render(<PreferencesPanel initial={{ ...PREFS, tone: "bold" }} onChange={vi.fn()} />);
-  expect(screen.getByLabelText("PDF style")).toHaveValue("professional");
+  render(<Stateful initial={{ ...PREFS, tone: "bold" }} onChange={vi.fn()} />);
   expect(screen.getByLabelText("Max pages")).toHaveValue(2);
   expect(screen.getByLabelText("Tone")).toHaveValue("bold");
 });
 
 test("every edit reports the full preferences", async () => {
   const onChange = vi.fn();
-  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
-  await userEvent.selectOptions(screen.getByLabelText("PDF style"), "classic");
+  render(<Stateful initial={PREFS} onChange={onChange} />);
   await userEvent.clear(screen.getByLabelText("Max pages"));
   await userEvent.type(screen.getByLabelText("Max pages"), "3");
   await userEvent.type(screen.getByLabelText("Tone"), "concise");
   await userEvent.type(screen.getByLabelText("Notes for the AI"), "Lead with AI");
   expect(onChange).toHaveBeenLastCalledWith({
     ...PREFS,
-    style: "classic",
     max_pages: 3,
     tone: "concise",
     notes: "Lead with AI",
@@ -115,16 +127,16 @@ test("every edit reports the full preferences", async () => {
 });
 
 test("phone checkbox reflects the saved preference", () => {
-  const { unmount } = render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  const { unmount } = render(<Stateful initial={PREFS} onChange={vi.fn()} />);
   expect(screen.getByRole("checkbox", { name: "Include phone number in generated resume" })).toBeChecked();
   unmount();
-  render(<PreferencesPanel initial={{ ...PREFS, include_phone: false }} onChange={vi.fn()} />);
+  render(<Stateful initial={{ ...PREFS, include_phone: false }} onChange={vi.fn()} />);
   expect(screen.getByRole("checkbox", { name: "Include phone number in generated resume" })).not.toBeChecked();
 });
 
 test("unchecking the phone option saves include_phone false", async () => {
   const onChange = vi.fn();
-  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
+  render(<Stateful initial={PREFS} onChange={onChange} />);
   await userEvent.click(screen.getByRole("checkbox", { name: "Include phone number in generated resume" }));
   expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, include_phone: false });
 });
@@ -132,28 +144,28 @@ test("unchecking the phone option saves include_phone false", async () => {
 const GRADUATION = "Include university graduation year in generated resume";
 
 test("graduation year checkbox is off by default and reflects the saved preference", () => {
-  const { unmount } = render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  const { unmount } = render(<Stateful initial={PREFS} onChange={vi.fn()} />);
   expect(screen.getByRole("checkbox", { name: GRADUATION })).not.toBeChecked();
   unmount();
-  render(<PreferencesPanel initial={{ ...PREFS, include_graduation_year: true }} onChange={vi.fn()} />);
+  render(<Stateful initial={{ ...PREFS, include_graduation_year: true }} onChange={vi.fn()} />);
   expect(screen.getByRole("checkbox", { name: GRADUATION })).toBeChecked();
 });
 
 test("checking the graduation year option saves include_graduation_year true", async () => {
   const onChange = vi.fn();
-  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
+  render(<Stateful initial={PREFS} onChange={onChange} />);
   await userEvent.click(screen.getByRole("checkbox", { name: GRADUATION }));
   expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, include_graduation_year: true });
 });
 
 test("experience year fields show the saved values", () => {
-  render(<PreferencesPanel initial={{ ...PREFS, professional_years: 12, earlier_years: 0 }} onChange={vi.fn()} />);
+  render(<Stateful initial={{ ...PREFS, professional_years: 12, earlier_years: 0 }} onChange={vi.fn()} />);
   expect(screen.getByLabelText("Professional Experience (years)")).toHaveValue(12);
   expect(screen.getByLabelText("Earlier Experience (years)")).toHaveValue(0);
 });
 
 test("experience year fields have sensible limits", () => {
-  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  render(<Stateful initial={PREFS} onChange={vi.fn()} />);
   const professional = screen.getByLabelText("Professional Experience (years)");
   const earlier = screen.getByLabelText("Earlier Experience (years)");
   expect(professional).toHaveAttribute("min", "1");
@@ -164,7 +176,7 @@ test("experience year fields have sensible limits", () => {
 
 test("editing experience years saves numbers", async () => {
   const onChange = vi.fn();
-  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
+  render(<Stateful initial={PREFS} onChange={onChange} />);
   await userEvent.clear(screen.getByLabelText("Professional Experience (years)"));
   await userEvent.type(screen.getByLabelText("Professional Experience (years)"), "20");
   await userEvent.clear(screen.getByLabelText("Earlier Experience (years)"));
@@ -184,29 +196,30 @@ const MODELS = [
 ];
 
 test("model select lists every model, default first", () => {
-  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  render(<Stateful initial={PREFS} onChange={vi.fn()} />);
   const select = screen.getByLabelText("AI model");
   expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(MODELS);
   expect(select).toHaveValue("openai/gpt-oss-120b");
 });
 
 test("model select shows the saved model", () => {
-  render(<PreferencesPanel initial={{ ...PREFS, model: "openai/gpt-6-sol" }} onChange={vi.fn()} />);
+  render(<Stateful initial={{ ...PREFS, model: "openai/gpt-6-sol" }} onChange={vi.fn()} />);
   expect(screen.getByLabelText("AI model")).toHaveValue("openai/gpt-6-sol");
 });
 
 test("choosing a model saves it", async () => {
   const onChange = vi.fn();
-  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
+  render(<Stateful initial={PREFS} onChange={onChange} />);
   await userEvent.selectOptions(screen.getByLabelText("AI model"), "anthropic/claude-sonnet-5.5");
   expect(onChange).toHaveBeenLastCalledWith({ ...PREFS, model: "anthropic/claude-sonnet-5.5" });
 });
 
-test("preferences are grouped: resume generation first, PDF last", () => {
-  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
-  const legends = screen.getAllByRole("group").map((group) => group.querySelector("legend")!.textContent);
-  expect(legends).toEqual(["Resume generation", "PDF"]);
-  const generation = screen.getByRole("group", { name: "Resume generation" });
+test("preferences hold the resume generation settings with no section label and no PDF style", () => {
+  render(<Stateful initial={PREFS} onChange={vi.fn()} />);
+  expect(screen.queryByText("Resume generation")).not.toBeInTheDocument();
+  expect(screen.queryByRole("group")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("PDF style")).not.toBeInTheDocument();
+  const generation = document.body;
   for (const label of [
     "AI model",
     "Professional Experience (years)",
@@ -220,9 +233,6 @@ test("preferences are grouped: resume generation first, PDF last", () => {
   }
   expect(within(generation).getByRole("checkbox", { name: "Include phone number in generated resume" })).toBeInTheDocument();
   expect(within(generation).getByRole("checkbox", { name: GRADUATION })).toBeInTheDocument();
-  const pdf = screen.getByRole("group", { name: "PDF" });
-  expect(within(pdf).getByLabelText("PDF style")).toBeInTheDocument();
-  expect(within(pdf).queryByLabelText("AI model")).not.toBeInTheDocument();
 });
 
 function entries(count: number) {
@@ -267,7 +277,7 @@ test("history cap is applied when the panel is expanded again", async () => {
 const LEVELS = ["Light polish", "Smart integration", "Full tailoring"];
 
 test("optimization level lists the three levels and shows the saved one with its description", () => {
-  render(<PreferencesPanel initial={{ ...PREFS, optimization: "full" }} onChange={vi.fn()} />);
+  render(<Stateful initial={{ ...PREFS, optimization: "full" }} onChange={vi.fn()} />);
   const select = screen.getByLabelText("Optimization level");
   expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(LEVELS);
   expect(select).toHaveValue("full");
@@ -278,7 +288,7 @@ test("optimization level lists the three levels and shows the saved one with its
 
 test("choosing an optimization level saves it and updates the description", async () => {
   const onChange = vi.fn();
-  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
+  render(<Stateful initial={PREFS} onChange={onChange} />);
   const select = screen.getByLabelText("Optimization level");
   expect(select).toHaveAccessibleDescription(
     "Naturally integrates the skills and requirements into the work history to make a stronger impression.",
@@ -330,7 +340,7 @@ function modelOptions() {
 
 test("Pro mode is off by default and turning it on shows the Pro models, with no judge setting", async () => {
   const onChange = vi.fn();
-  render(<PreferencesPanel initial={PREFS} onChange={onChange} />);
+  render(<Stateful initial={PREFS} onChange={onChange} />);
   const pro = screen.getByRole("checkbox", { name: "Pro mode" });
   expect(pro).not.toBeChecked();
   expect(screen.queryByRole("group", { name: "Pro models (2-4)" })).not.toBeInTheDocument();
@@ -342,7 +352,7 @@ test("Pro mode is off by default and turning it on shows the Pro models, with no
 });
 
 test("in Pro mode the AI model judges: it is never a Pro model", () => {
-  render(<PreferencesPanel initial={{ ...PREFS, pro_mode: true }} onChange={vi.fn()} />);
+  render(<Stateful initial={{ ...PREFS, pro_mode: true }} onChange={vi.fn()} />);
   expect(proCheckbox("openai/gpt-oss-120b")).toBeDisabled();
   expect(proCheckbox("openai/gpt-oss-120b")).not.toBeChecked();
   expect(proCheckbox("openai/gpt-oss-120b")).toHaveAccessibleName("openai/gpt-oss-120b (AI model, judges)");
@@ -352,14 +362,14 @@ test("in Pro mode the AI model judges: it is never a Pro model", () => {
 });
 
 test("with Pro mode off every model can be the AI model", () => {
-  render(<PreferencesPanel initial={PREFS} onChange={vi.fn()} />);
+  render(<Stateful initial={PREFS} onChange={vi.fn()} />);
   expect(modelOptions()).toHaveLength(MODELS.length);
 });
 
 test("turning Pro mode on drops the AI model from the Pro models and keeps at least 2", async () => {
   const onChange = vi.fn();
   const prefs = { ...PREFS, model: "anthropic/claude-haiku-5.5" as const };
-  render(<PreferencesPanel initial={prefs} onChange={onChange} />);
+  render(<Stateful initial={prefs} onChange={onChange} />);
   await userEvent.click(screen.getByRole("checkbox", { name: "Pro mode" }));
   expect(onChange).toHaveBeenLastCalledWith({
     ...prefs,
@@ -385,7 +395,7 @@ test("proModelsWithout removes the AI model and tops up in model list order", ()
 
 test("Pro models keep at least 2: the last two cannot be unchecked", async () => {
   const onChange = vi.fn();
-  render(<PreferencesPanel initial={{ ...PREFS, pro_mode: true }} onChange={onChange} />);
+  render(<Stateful initial={{ ...PREFS, pro_mode: true }} onChange={onChange} />);
   expect(proCheckbox("anthropic/claude-haiku-5.5")).toBeDisabled();
   await userEvent.click(proCheckbox("openai/gpt-6-sol"));
   expect(onChange).toHaveBeenLastCalledWith({
@@ -404,7 +414,7 @@ test("Pro models keep at least 2: the last two cannot be unchecked", async () =>
 
 test("Pro models allow at most 4", () => {
   const four = ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5", "openai/gpt-6-sol", "openai/gpt-5.4-nano"] as const;
-  render(<PreferencesPanel initial={{ ...PREFS, pro_mode: true, pro_models: [...four] }} onChange={vi.fn()} />);
+  render(<Stateful initial={{ ...PREFS, pro_mode: true, pro_models: [...four] }} onChange={vi.fn()} />);
   for (const model of four) expect(proCheckbox(model)).toBeEnabled();
   expect(proCheckbox("anthropic/claude-opus-5.5")).toBeDisabled();
   expect(proCheckbox("google/gemini-4-argon")).toBeDisabled();

@@ -44,14 +44,13 @@ test("loads baseline, history and preferences on mount", async () => {
   await userEvent.click(baseline);
   expect(screen.getByLabelText("Baseline resume content")).toHaveTextContent("# Saved resume");
   expect(await screen.findByText("Acme")).toBeInTheDocument();
-  expect(await screen.findByLabelText("PDF style")).toHaveValue("modern");
-  expect(screen.getByLabelText("Tone")).toHaveValue("concise");
+  expect(await screen.findByLabelText("Tone")).toHaveValue("concise");
 });
 
 test("shows empty baseline when none saved", async () => {
   mockData(null);
   render(<Workspace />);
-  await screen.findByLabelText("PDF style");
+  await screen.findByLabelText("Tone");
   expect(screen.getByRole("button", { name: "Baseline resume" })).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByText("No resume uploaded yet.")).toBeInTheDocument();
 });
@@ -74,8 +73,31 @@ test("uploading a resume saves it and shows the saved content", async () => {
 test("changing a preference saves it without a button", async () => {
   const fetchMock = mockData();
   render(<Workspace />);
-  await userEvent.selectOptions(await screen.findByLabelText("PDF style"), "classic");
+  await userEvent.selectOptions(await screen.findByLabelText("Optimization level"), "light");
+  await waitFor(() => expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, optimization: "light" }));
+});
+
+test("the PDF style is set in the Custom resume header and saved with the preferences", async () => {
+  const fetchMock = mockChat({ body: RESUME_RESULT });
+  await ready();
+  expect(screen.queryByLabelText("PDF style")).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  const style = await screen.findByLabelText("PDF style");
+  expect(style).toHaveValue("modern");
+  await userEvent.selectOptions(style, "classic");
   await waitFor(() => expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, style: "classic" }));
+  expect(style).toHaveValue("classic");
+});
+
+test("a preference changed after the PDF style keeps the new style", async () => {
+  const fetchMock = mockChat({ body: RESUME_RESULT });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await userEvent.selectOptions(await screen.findByLabelText("PDF style"), "classic");
+  await userEvent.selectOptions(screen.getByLabelText("Optimization level"), "full");
+  await waitFor(() =>
+    expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, style: "classic", optimization: "full" }),
+  );
 });
 
 test("job description is kept as typed", async () => {
@@ -150,7 +172,7 @@ test("generate is disabled without a job description", async () => {
 test("generate is disabled without a baseline", async () => {
   mockData(null);
   render(<Workspace />);
-  await screen.findByLabelText("PDF style");
+  await screen.findByLabelText("Tone");
   await userEvent.type(screen.getByLabelText("Job description"), "Director at Initech");
   expect(screen.getByRole("button", { name: "Generate custom resume" })).toBeDisabled();
 });

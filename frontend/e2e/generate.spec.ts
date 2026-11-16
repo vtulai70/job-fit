@@ -276,3 +276,32 @@ test("Pro mode: pick a candidate, download it, and see its judge and rank in his
   await page.getByRole("checkbox", { name: "Pro mode" }).uncheck();
   expect((await off).status()).toBe(200);
 });
+
+test("PDF style is chosen in the Custom resume header, persists, and styles the preview", async ({ page }) => {
+  const reply = { reply: "Done.", company: "Umbrella Corp", resume_md: TAILORED };
+  await mockGenerate(page, [reply, reply]);
+  await prepare(page);
+  await page.getByRole("button", { name: "Generate custom resume" }).click();
+  const header = page.getByRole("heading", { name: "Custom resume for Umbrella Corp" }).locator("..");
+  const style = header.getByLabel("PDF style");
+  const saved = page.waitForResponse(
+    (r) => r.url().endsWith("/api/preferences") && r.request().postDataJSON()?.style === "modern",
+  );
+  await style.selectOption("modern");
+  expect((await saved).ok()).toBe(true);
+  const styleBox = (await style.boundingBox())!;
+  const toggleBox = (await header.getByRole("button", { name: "Markdown" }).boundingBox())!;
+  expect(styleBox.x + styleBox.width).toBeLessThanOrEqual(toggleBox.x);
+
+  const previewed = page.waitForRequest((r) => r.url().endsWith("/api/preview"));
+  await header.getByRole("button", { name: "Preview" }).click();
+  expect((await previewed).postDataJSON()).toMatchObject({ style: "modern" });
+
+  await page.reload();
+  await page.getByLabel("Job description").fill("Umbrella Corp is hiring a Director of Engineering.");
+  await page.getByRole("button", { name: "Generate custom resume" }).click();
+  await expect(page.getByLabel("PDF style")).toHaveValue("modern");
+  const reset = page.waitForResponse((r) => r.url().endsWith("/api/preferences") && r.request().method() === "PUT");
+  await page.getByLabel("PDF style").selectOption("professional");
+  expect((await reset).ok()).toBe(true);
+});

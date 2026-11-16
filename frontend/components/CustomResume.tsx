@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import type { GenerationSettings, Model, ProCandidate, Style } from "@/lib/api";
+import { type GenerationSettings, type Model, type ProCandidate, STYLES, type Style } from "@/lib/api";
 
 /** `settings` are the preferences that generated the resume (saved with its download; for a Pro candidate,
  * `model` is the candidate's). `review` is the judge's review of a Pro candidate. */
@@ -30,6 +30,8 @@ type Props = {
   style: Style;
   renderPreview: (content_md: string, style: Style) => Promise<string>;
   onChange: (content_md: string) => void;
+  /** The saved PDF style was changed here (it is a preference, persisted by the caller). */
+  onStyleChange: (style: Style) => void;
   onDownload: () => void;
 };
 
@@ -38,8 +40,8 @@ const MODES: { mode: Mode; label: string }[] = [
   { mode: "preview", label: "Preview" },
 ];
 
-/** The generated custom resume: editable Markdown or a preview as the PDF renders it, plus PDF download. */
-export default function CustomResume({ resume, pro, style, renderPreview, onChange, onDownload }: Props) {
+/** The generated custom resume: PDF style, editable Markdown or a preview as the PDF renders it, and PDF download. */
+export default function CustomResume({ resume, pro, style, renderPreview, onChange, onStyleChange, onDownload }: Props) {
   const [mode, setMode] = useState<Mode>("markdown");
   const [html, setHtml] = useState("");
   const content = resume?.content_md;
@@ -59,6 +61,18 @@ export default function CustomResume({ resume, pro, style, renderPreview, onChan
         <h2 className="font-semibold">Custom resume{resume && ` for ${resume.company}`}</h2>
         {resume && (
           <div className="flex items-center gap-3">
+            <select
+              aria-label="PDF style"
+              value={style}
+              onChange={(e) => onStyleChange(e.target.value as Style)}
+              className="rounded border border-line bg-canvas px-2 py-1 text-sm focus:border-primary focus:outline-none"
+            >
+              {STYLES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
             <div className="flex overflow-hidden rounded border border-line text-sm">
               {MODES.map((m) => (
                 <button
