@@ -1,5 +1,7 @@
 """Baseline resume: read and replace the current user's baseline."""
 
+import logging
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -7,6 +9,7 @@ from app.auth import UserId
 from app.db import Db, now
 
 router = APIRouter(prefix="/api/resume")
+log = logging.getLogger(__name__)
 
 
 class BaselineIn(BaseModel):
@@ -37,4 +40,5 @@ def put_baseline(body: BaselineIn, user_id: UserId, db: Db) -> Baseline:
         "updated_at = excluded.updated_at",
         (user_id, body.content_md, updated_at),
     )
+    log.info("Saved baseline resume (%d chars)", len(body.content_md))
     return Baseline(content_md=body.content_md, updated_at=updated_at)

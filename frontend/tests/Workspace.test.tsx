@@ -764,10 +764,11 @@ test("a generation blocked by the plan shows the backend's reason in the chat", 
   expect(screen.queryByText(GENERATE_FAILED)).not.toBeInTheDocument();
 });
 
-test("other failures keep the generic message", () => {
-  expect(failureReply(new ApiError(500, "Internal", "x"))).toBe(GENERATE_FAILED);
+test("other failures keep the generic message, with the request id to find in the backend log", () => {
+  expect(failureReply(new ApiError(500, "Internal", "ab12cd34", "x"))).toBe(`${GENERATE_FAILED} (Error reference ab12cd34)`);
+  expect(failureReply(new ApiError(502, null, null, "x"))).toBe(GENERATE_FAILED);
   expect(failureReply(new Error("network"))).toBe(GENERATE_FAILED);
-  expect(failureReply(new ApiError(403, "Pro mode is available on the Pro plan.", "x"))).toBe(
+  expect(failureReply(new ApiError(403, "Pro mode is available on the Pro plan.", "ab12cd34", "x"))).toBe(
     "Pro mode is available on the Pro plan.",
   );
 });

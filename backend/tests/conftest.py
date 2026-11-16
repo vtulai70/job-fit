@@ -12,6 +12,7 @@ static_dir = Path(tempfile.mkdtemp())
 (static_dir / "index.html").write_text("<html><body>JobFit test page</body></html>")
 os.environ["STATIC_DIR"] = str(static_dir)
 os.environ["CLERK_SECRET_KEY"] = "sk_test_unit"
+os.environ["LOG_FILE"] = str(Path(tempfile.mkdtemp()) / "jobfit.log")
 
 # uv is a hardened-runtime binary, so macOS strips DYLD_* variables before Python starts.
 # WeasyPrint finds Homebrew's Pango through ctypes, which reads this at import time.

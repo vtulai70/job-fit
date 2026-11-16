@@ -1,5 +1,6 @@
 """Clerk authentication: verify the session token and map the Clerk user to a local user row."""
 
+import logging
 import os
 from typing import Annotated
 
@@ -7,7 +8,10 @@ from clerk_backend_api.security import authenticate_request
 from clerk_backend_api.security.types import AuthenticateRequestOptions
 from fastapi import Depends, HTTPException, Request
 
+from app import logs
 from app.db import Db, add_user
+
+log = logging.getLogger(__name__)
 
 
 def auth_options() -> AuthenticateRequestOptions:
@@ -24,6 +28,7 @@ def session_claims(request: Request) -> dict:
     FastAPI resolves it once per request, so the user and plan dependencies share one verification."""
     state = authenticate_request(request, auth_options())
     if not state.is_signed_in:
+        log.info("Not signed in: %s", state.message)
         raise HTTPException(status_code=401, detail="Not signed in")
     return state.payload
 
@@ -41,6 +46,7 @@ CurrentUser = Annotated[str, Depends(current_user)]
 
 def current_user_id(clerk_id: CurrentUser, db: Db) -> int:
     """Return the local user id, creating the row on the user's first request."""
+    logs.set_user(clerk_id)
     add_user(db, clerk_id)
     return db.execute("SELECT id FROM users WHERE username = ?", (clerk_id,)).fetchone()["id"]
 

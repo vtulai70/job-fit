@@ -106,6 +106,13 @@ test("a failed call carries the backend's message for the user", async () => {
   expect([error.status, error.detail]).toEqual([429, "You have used all 5 resumes."]);
 });
 
+test("a failed call carries the backend's request id", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ detail: "boom" }, { status: 500, headers: { "X-Request-ID": "ab12cd34" } })));
+  const error = await api.getPlan().catch((e) => e);
+  expect(error.requestId).toBe("ab12cd34");
+  expect(error.message).toBe("GET /api/plan failed: 500 (request ab12cd34)");
+});
+
 test("a failed call without a message has no detail", async () => {
   mockFetch({ "GET /api/plan": { status: 500 } });
   const error = await api.getPlan().catch((e) => e);

@@ -1,6 +1,8 @@
 """OpenRouter access through the OpenAI SDK."""
 
+import logging
 import os
+import time
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
@@ -8,6 +10,8 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 from app.auth import CurrentUser
+
+log = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1"
 Model = Literal[
@@ -52,15 +56,30 @@ def ask(client: OpenAI, question: str) -> str:
 def ask_structured[T: BaseModel](client: OpenAI, messages: list[dict], schema: type[T], model: str = MODEL) -> T:
     """Chat completion parsed into a Pydantic model (Structured Outputs).
 
-    require_parameters routes only to OpenRouter providers that support response_format.
+    require_parameters routes only to OpenRouter providers that support response_format. Each call is logged
+    with its model, duration and token usage (or its error); message text is not logged.
     """
-    completion = client.chat.completions.parse(
-        model=model,
-        messages=messages,
-        response_format=schema,
-        extra_body={"provider": {"require_parameters": True}},
+    started = time.perf_counter()
+    try:
+        completion = client.chat.completions.parse(
+            model=model,
+            messages=messages,
+            response_format=schema,
+            extra_body={"provider": {"require_parameters": True}},
+        )
+    except Exception as error:
+        log.error("AI %s (%s) failed after %.1f s: %s: %s", model, schema.__name__, time.perf_counter() - started,
+                  type(error).__name__, error)
+        raise
+    choice, usage = completion.choices[0], completion.usage
+    log.info(
+        "AI %s (%s) answered in %.1f s: %s prompt + %s completion tokens, finish %s, %d messages sent",
+        model, schema.__name__, time.perf_counter() - started, usage.prompt_tokens if usage else "?",
+        usage.completion_tokens if usage else "?", choice.finish_reason, len(messages),
     )
-    return completion.choices[0].message.parsed
+    if choice.message.parsed is None:
+        log.warning("AI %s (%s) returned no structured result (finish %s)", model, schema.__name__, choice.finish_reason)
+    return choice.message.parsed
 
 
 @router.get("/check")

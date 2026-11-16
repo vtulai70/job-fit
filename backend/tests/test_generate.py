@@ -28,11 +28,16 @@ You will lead platform teams, drive AI-assisted development adoption, and partne
 We value data-driven decisions, ownership and bias for action. Experience with AWS, Azure and Kubernetes."""
 
 
+def completion(message, usage=None, finish_reason="stop") -> SimpleNamespace:
+    """A chat completion as the OpenAI SDK returns it (only the fields the app reads)."""
+    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason=finish_reason)], usage=usage)
+
+
 def fake_client(result: GenerateResult) -> MagicMock:
     """OpenAI client stand-in whose parse() returns the given structured result."""
     client = MagicMock()
     message = SimpleNamespace(parsed=result)
-    client.chat.completions.parse.return_value = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+    client.chat.completions.parse.return_value = completion(message)
     return client
 
 

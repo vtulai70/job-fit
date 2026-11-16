@@ -1,5 +1,6 @@
 """Pro mode: several models write the resume in parallel and a judge model ranks them."""
 
+import contextvars
 import logging
 import random
 from concurrent.futures import ThreadPoolExecutor
@@ -128,6 +129,7 @@ def write_candidate(client: OpenAI, messages: list[dict], model: Model, schema: 
     if not result.resume_md:
         log.warning("Pro candidate %s returned no resume: %s", model, result.reply)
         return ProFailure(model=model, reason="returned no resume")
+    log.info("Pro candidate %s wrote a resume (%d chars)", model, len(result.resume_md))
     return Candidate(model=model, company=result.company, resume_md=result.resume_md)
 
 
@@ -136,7 +138,11 @@ def write_candidates(
 ) -> tuple[list[Candidate], list[ProFailure]]:
     """Every model's resume, written in parallel, and the models that returned none."""
     with ThreadPoolExecutor(max_workers=len(models)) as pool:
-        results = list(pool.map(lambda model: write_candidate(client, candidate_messages(messages), model, schema), models))
+        # Each worker runs in a copy of the request's context, so its log lines keep the request id and user.
+        context = contextvars.copy_context()
+        results = list(pool.map(
+            lambda model: context.copy().run(write_candidate, client, candidate_messages(messages), model, schema), models
+        ))
     return [r for r in results if isinstance(r, Candidate)], [r for r in results if isinstance(r, ProFailure)]
 
 
@@ -157,6 +163,11 @@ def judge(client: OpenAI, context_text: str, candidates: list[Candidate], judge_
         ProCandidate(**labelled[r.label].model_dump(), **r.model_dump(exclude={"label"}))
         for r in verdict.ranking
     ]
+    log.info("Judge %s ranked: %s", judge_model, ", ".join(
+        f"{c.model} {c.score:g} ({len(c.rule_violations)} violations)" for c in ranked
+    ))
+    if len(ranked) < len(candidates):
+        log.warning("Judge %s ranked %d of %d candidates", judge_model, len(ranked), len(candidates))
     return ProResult(candidates=ranked, rationale=verdict.rationale, judge_model=judge_model)
 
 

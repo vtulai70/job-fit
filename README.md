@@ -24,6 +24,8 @@ Requires Docker and a `.env` in the project root with `OPENROUTER_API_KEY`, `NEX
 
 Then open http://localhost:8000. Rerun the start script after code changes to rebuild the container.
 
+Logs: `data/logs/jobfit.log` (and `docker logs jobfit`). A chat error shows an "Error reference"; `grep` the log for it.
+
 ## Test
 
 - Backend: `cd backend && uv run pytest` (macOS needs `brew install pango`)

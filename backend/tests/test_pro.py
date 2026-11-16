@@ -70,7 +70,7 @@ class FakeAI:
             parsed = self.candidates.get(model, candidate_result(model))
             if isinstance(parsed, Exception):
                 raise parsed
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(parsed=parsed))])
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(parsed=parsed), finish_reason="stop")], usage=None)
 
     def calls(self, **match) -> list[dict]:
         return [

@@ -1,5 +1,6 @@
 """SQLite access: schema creation, seeding and a per-request connection."""
 
+import logging
 import os
 import sqlite3
 from collections.abc import Iterator
@@ -9,6 +10,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
+log = logging.getLogger(__name__)
 DB_PATH = Path(os.environ.get("DB_PATH", "data/jobfit.db"))
 
 SCHEMA = """
@@ -102,6 +104,7 @@ def init_db() -> None:
     for column, sql_type in ADDED_HISTORY_COLUMNS.items():
         if column not in columns:
             conn.execute(f"ALTER TABLE custom_resumes ADD COLUMN {column} {sql_type}")
+            log.info("Added column custom_resumes.%s to %s", column, DB_PATH)
     conn.close()
 
 

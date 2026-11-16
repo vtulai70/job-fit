@@ -14,7 +14,8 @@ Written ahead of the code (Step 1); update as code lands.
 
 ## Layout
 
-- `app/main.py` - app creation, lifespan (creates db), session middleware, routers, static mount
+- `app/main.py` - app creation, lifespan (configures logging, logs the settings, creates db), the request logging middleware and error handlers from `app/logs.py`, routers, static mount
+- `app/logs.py` - `configure_logging` (the `app` logger to stderr and a `RotatingFileHandler` at `LOG_FILE`, default `data/logs/jobfit.log`, level `LOG_LEVEL`, default `INFO`; format `time LEVEL logger [request_id user] message`), `current` (one record per request: FastAPI runs sync dependencies and routes in threads with copies of the context, so `set_user` fills in the shared record instead of setting a variable; Pro worker threads run in a copy of the request context), `log_requests` middleware (request id, `X-Request-ID`, one line per `/api` request with status and duration, `/api/health` at DEBUG, tracebacks for unhandled errors), `log_http_error` (logs each HTTPException's status and detail) and `log_validation_error` (422 locations and messages, never the values)
 - `app/auth.py` - Clerk session verification (`clerk-backend-api` `authenticate_request`, cookie or Bearer) in `session_claims` (`Claims`, resolved once per request and shared by the user and plan dependencies); `CurrentUser` (Clerk user id) and `UserId` (local db id, row created on first request)
 - `app/db.py` - schema (see `docs/DATABASE.md`), `init_db` (also adds the `ADDED_HISTORY_COLUMNS` (generation settings: `model`, `optimization`, `professional_years`, `earlier_years`, `max_pages`, `tone`, `notes`, then `pro_judge_model`, `pro_rank`, with their SQL types) to older `custom_resumes` tables), `connect`, `Db` per-request connection dependency
 - `app/plans.py` - Clerk Billing: `Plan` (key, features, `has`, `limit`) from the token claims (`plan_from_claims`: `pla` without its `u:` scope, default `free`; `fea` comma-separated, absent when none), `CurrentPlan` dependency (`current_plan`), `MONTHLY_GENERATIONS` (`free` 5, `basic` 50, `pro` 200; an unknown plan gets the free limit), usage in the `generations` table (`used_this_month`, `record_generations`, calendar months in UTC, `utc_now` patched in tests), `GET /api/plan` (`{plan, features, limit, used, resets_at}`)
@@ -37,11 +38,12 @@ Written ahead of the code (Step 1); update as code lands.
 - All API routes live under `/api`
 - Every data route takes `UserId` and filters by it
 - Raw SQL via stdlib `sqlite3`; no ORM
-- Config from environment: `OPENROUTER_API_KEY`, `DB_PATH` (default `data/jobfit.db`), `STATIC_DIR`, `CLERK_SECRET_KEY`, `CLERK_AUTHORIZED_PARTIES` (comma-separated origins, default `http://localhost:8000`)
+- Config from environment: `OPENROUTER_API_KEY`, `DB_PATH` (default `data/jobfit.db`), `LOG_FILE` (default `data/logs/jobfit.log`), `LOG_LEVEL` (default `INFO`), `STATIC_DIR`, `CLERK_SECRET_KEY`, `CLERK_AUTHORIZED_PARTIES` (comma-separated origins, default `http://localhost:8000`)
 - Tests override `auth.current_user` and `plans.current_plan` for data routes (the `signed_in` fixture is on Pro with every feature; `on_plan(key, *features)` switches plan; `tests/test_billing.py` covers access and limits); `tests/test_auth.py` signs real RS256 tokens with a local key to test verification without network
 - When changing the prompt, run the `integration` tests a few times: they check real output against the resume rules. `test_real_generation_with_each_model` calls every selectable model (includes Opus; costs a few cents); select with `-k each_model`
 - `tests/test_pro.py` fakes each model and the judge separately (`FakeAI`); a `threading.Barrier` proves the candidates run in parallel. Its integration tests run a real Pro round (default Pro models, the default AI model judging, about 30 s) and check the judge flags a planted invented role
 - Unit tests never call OpenRouter: override `ai.get_client` via `app.dependency_overrides`
+- Log with `logging.getLogger(__name__)` (an `app.*` logger); log ids, sizes, models, timings and errors, never resume, job description or chat text, or secrets (`tests/test_logging.py` checks this)
 - Short modules and functions; no defensive code; no emojis
 
 ## macOS setup

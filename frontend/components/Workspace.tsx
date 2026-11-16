@@ -15,10 +15,12 @@ export const GENERATE_MESSAGE = "Please generate my custom resume for this job d
 export const CLEAR_FAILED = "Could not clear the download history. Please try again.";
 export const GENERATE_FAILED = "Sorry, something went wrong. Please try again.";
 
-/** The chat reply for a failed generation: the backend's reason when the plan blocked it (403, 429). */
+/** The chat reply for a failed generation: the backend's reason when the plan blocked it (403, 429), else the
+ * generic message with the request id to look up in the backend log. */
 export function failureReply(error: unknown): string {
-  const blocked = error instanceof api.ApiError && (error.status === 403 || error.status === 429);
-  return (blocked && error.detail) || GENERATE_FAILED;
+  if (!(error instanceof api.ApiError)) return GENERATE_FAILED;
+  if ((error.status === 403 || error.status === 429) && error.detail) return error.detail;
+  return error.requestId ? `${GENERATE_FAILED} (Error reference ${error.requestId})` : GENERATE_FAILED;
 }
 const UNKNOWN_COMPANY = "Unknown company";
 
@@ -115,7 +117,8 @@ export default function Workspace({ plan, onUsageChanged }: Props) {
     try {
       await api.clearHistory();
       setHistory([]);
-    } catch {
+    } catch (error) {
+      console.error("Clearing the download history failed", error);
       window.alert(CLEAR_FAILED);
     }
   }
@@ -123,7 +126,9 @@ export default function Workspace({ plan, onUsageChanged }: Props) {
   /** Save each change in order; a failed save does not block later ones. */
   function savePreferences(next: api.Preferences) {
     setPrefs(next);
-    prefsSaved.current = prefsSaved.current.catch(() => {}).then(() => api.putPreferences(next));
+    prefsSaved.current = prefsSaved.current
+      .catch((error) => console.error("Saving preferences failed", error))
+      .then(() => api.putPreferences(next));
   }
 
   /** Show the model and settings that will be used, then send the message with the AI conversation so far. */
@@ -143,6 +148,7 @@ export default function Workspace({ plan, onUsageChanged }: Props) {
       setMessages([...sent, ...failures, { role: "assistant", content: result.reply }]);
       if (result.resume_md) setGenerated(generatedFrom(result));
     } catch (error) {
+      console.error("Generation failed", error);
       setMessages([...sent, { role: "assistant", content: failureReply(error) }]);
     } finally {
       setBusy(false);

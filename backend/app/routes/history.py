@@ -1,6 +1,8 @@
 """Download history of custom resumes, and PDF re-download."""
 
+import logging
 import re
+import time
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Response
@@ -14,6 +16,7 @@ from app.plans import CurrentPlan, Plan
 from app.routes.preferences import GENERATION_FIELDS, GenerationSettings, Style
 
 router = APIRouter(prefix="/api/history")
+log = logging.getLogger(__name__)
 
 
 PRO_FIELDS = ("pro_judge_model", "pro_rank")
@@ -76,6 +79,7 @@ def add_history(body: HistoryIn, user_id: UserId, db: Db, plan: CurrentPlan) -> 
         f"INSERT INTO custom_resumes ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})",
         tuple(row.values()),
     )
+    log.info("Saved download %d: company %r, %s style, model %s", cursor.lastrowid, body.company, body.style, body.model)
     return HistoryEntry(id=cursor.lastrowid, **row)
 
 
@@ -96,8 +100,12 @@ def history_pdf(entry_id: int, user_id: UserId, db: Db, plan: CurrentPlan) -> Re
     if not row:
         raise HTTPException(status_code=404, detail="Not found")
     filename = pdf_filename(row["content_md"], row["company"])
+    started = time.perf_counter()
+    pdf = render_pdf(row["content_md"], row["style"])
+    log.info("Rendered PDF for download %d (%s style, %d bytes) in %.0f ms", entry_id, row["style"], len(pdf),
+             (time.perf_counter() - started) * 1000)
     return Response(
-        render_pdf(row["content_md"], row["style"]),
+        pdf,
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
     )

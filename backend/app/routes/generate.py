@@ -1,5 +1,6 @@
 """Chat-based custom resume generation."""
 
+import logging
 from datetime import date, datetime
 from typing import Literal
 
@@ -16,6 +17,7 @@ from app.plans import CurrentPlan, Plan, record_generations, used_this_month
 from app.routes.preferences import GenerationSettings, Preferences, generation_settings, load_preferences
 
 router = APIRouter(prefix="/api")
+log = logging.getLogger(__name__)
 
 
 class ChatMessage(BaseModel):
@@ -123,13 +125,22 @@ def generate(body: GenerateRequest, user_id: UserId, db: Db, client: Client, pla
     """
     prefs = load_preferences(db, user_id)
     moment = plans.utc_now()
-    check_access(plan, prefs, used_this_month(db, user_id, moment), plans.next_month_start(moment))
+    used = used_this_month(db, user_id, moment)
+    log.info(
+        "Generate: %s plan %d/%d used, model %s, optimization %s, pro mode %s%s, %d earlier messages, job %d chars",
+        plan.key, used, plan.limit, prefs.model, prefs.optimization, prefs.pro_mode,
+        f" ({', '.join(prefs.pro_models)})" if prefs.pro_mode else "", len(body.history), len(body.job_description),
+    )
+    check_access(plan, prefs, used, plans.next_month_start(moment))
     baseline, year = load_baseline(db, user_id), date.today().year
+    if not baseline:
+        log.warning("Generate without a baseline resume")
     messages = build_messages(build_system_prompt(baseline, body.job_description, prefs, year), body.history, body.message)
     settings = generation_settings(prefs).model_dump()
     if prefs.pro_mode:
         chat_system = build_pro_chat_prompt(baseline, body.job_description, prefs, year)
         chat = ask_structured(client, build_messages(chat_system, body.history, body.message), ProChatResult, prefs.model)
+        log.info("Pro mode ready check: %s", "ready" if chat.ready else "asking questions")
         if not chat.ready:
             return GenerateResponse(reply=chat.reply, company=None, experience_plan=[], resume_md=None, **settings)
         response = pro_turn(client, messages, context(baseline, body.job_description, prefs, year), prefs, settings)
@@ -138,6 +149,9 @@ def generate(body: GenerateRequest, user_id: UserId, db: Db, client: Client, pla
     result = ask_structured(client, messages, GenerateResult, prefs.model)
     if result.resume_md:
         record_generations(db, user_id, [prefs.model], False, moment)
+        log.info("Generated a resume: %d chars, company %r", len(result.resume_md), result.company)
+    else:
+        log.info("The AI asked questions instead of writing the resume")
     return GenerateResponse(**result.model_dump(), **settings)
 
 

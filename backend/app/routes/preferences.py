@@ -1,6 +1,7 @@
 """User preferences stored as a JSON object."""
 
 import json
+import logging
 from typing import Literal, get_args
 
 from fastapi import APIRouter
@@ -11,6 +12,7 @@ from app.auth import UserId
 from app.db import Db, now
 
 router = APIRouter(prefix="/api/preferences")
+log = logging.getLogger(__name__)
 
 Style = Literal["professional", "modern", "classic"]
 Optimization = Literal["light", "smart", "full"]
@@ -70,12 +72,17 @@ def without_removed_models(data: dict) -> dict:
     models dropped (with the AI model in Pro mode), topped up to the minimum in list order."""
     models = get_args(Model)
     model = data.get("model", MODEL) if data.get("model", MODEL) in models else MODEL
+    if model != data.get("model", MODEL):
+        log.warning("Saved preferences named a removed AI model %s; using %s", data.get("model"), model)
     if "pro_models" not in data:
         return {**data, "model": model}
     excluded = {model} if data.get("pro_mode") else set()
     kept = [m for m in data["pro_models"] if m in models and m not in excluded]
     extra = [m for m in models if m not in kept and m != model][: max(0, PRO_MIN_MODELS - len(kept))]
-    return {**data, "model": model, "pro_models": [m for m in models if m in kept or m in extra]}
+    pro_models = [m for m in models if m in kept or m in extra]
+    if pro_models != data["pro_models"]:
+        log.warning("Saved preferences: Pro models %s -> %s", data["pro_models"], pro_models)
+    return {**data, "model": model, "pro_models": pro_models}
 
 
 def load_preferences(db: Db, user_id: int) -> Preferences:
@@ -98,4 +105,6 @@ def put_preferences(body: Preferences, user_id: UserId, db: Db) -> Preferences:
         "ON CONFLICT (user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at",
         (user_id, body.model_dump_json(), now()),
     )
+    log.debug("Saved preferences: model %s, optimization %s, pro mode %s, max pages %d, style %s",
+              body.model, body.optimization, body.pro_mode, body.max_pages, body.style)
     return body

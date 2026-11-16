@@ -129,11 +129,13 @@ export type NewHistoryEntry = {
 } & GenerationSettings &
   Partial<ProFields>;
 
-/** A failed API call; `detail` is the backend's message for the user, when it sent one. */
+/** A failed API call; `detail` is the backend's message for the user, when it sent one; `requestId` is the
+ * backend's X-Request-ID, which appears on every backend log line of that request. */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly detail: string | null,
+    readonly requestId: string | null,
     message: string,
   ) {
     super(message);
@@ -151,7 +153,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       (data) => (typeof data?.detail === "string" ? data.detail : null),
       () => null,
     );
-    throw new ApiError(response.status, detail, `${method} ${path} failed: ${response.status}`);
+    const requestId = response.headers.get("X-Request-ID");
+    throw new ApiError(response.status, detail, requestId, `${method} ${path} failed: ${response.status} (request ${requestId})`);
   }
   return response.json();
 }
