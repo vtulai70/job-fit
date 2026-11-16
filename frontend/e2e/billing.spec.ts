@@ -22,7 +22,11 @@ async function clerkUserId(page: Page): Promise<string> {
 test.describe("Free plan", () => {
   test("shows usage, locks Pro mode and premium models, and offers the pricing table", async ({ page }) => {
     await signIn(page, BOB);
-    await expect(page.getByText(/^\d+ of 5 resumes this month · Free plan$/)).toBeVisible();
+    const titleBar = page.getByRole("banner");
+    await expect(titleBar.getByText(/^\d+ of 5 resumes this month · Free plan$/)).toBeVisible();
+    const chat = page.getByRole("complementary", { name: "AI chat" });
+    await expect(chat.getByRole("button", { name: "Plans" })).toHaveCount(0);
+    await expect(chat.getByText(/resumes this month/)).toHaveCount(0);
     await expect(page.getByRole("checkbox", { name: "Pro mode" })).toBeDisabled();
     await expect(page.getByText("Pro plan", { exact: true })).toBeVisible();
     await expect(page.getByLabel("AI model").locator("option[disabled]")).toHaveText([
@@ -31,10 +35,14 @@ test.describe("Free plan", () => {
       "openai/gpt-6-sol (Pro plan)",
       "google/gemini-4-argon (Pro plan)",
     ]);
-    await page.getByRole("button", { name: "Plans" }).click();
+    const plans = titleBar.getByRole("button", { name: "Plans" });
+    const plansBox = (await plans.boundingBox())!;
+    const accountBox = (await titleBar.getByRole("button", { name: /open user menu/i }).boundingBox())!;
+    expect(plansBox.x + plansBox.width).toBeLessThanOrEqual(accountBox.x);
+    await plans.click();
     const dialog = page.getByRole("dialog", { name: "Plans" });
     await expect(dialog.getByText("Basic", { exact: true })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Subscribe" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Subscribe" }).last()).toBeVisible();
     const reloaded = page.waitForResponse((r) => r.url().endsWith("/api/plan"));
     await dialog.getByRole("button", { name: "Close" }).click();
     await expect(dialog).toHaveCount(0);

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
@@ -11,24 +11,24 @@ import Workspace, {
   GENERATE_MESSAGE,
   settingsNote,
 } from "@/components/Workspace";
-import { ApiError, type Preferences, type ProFailure } from "@/lib/api";
+import { ApiError, type PlanInfo, type Preferences, type ProFailure } from "@/lib/api";
 
 import { mockFetch } from "./fetchMock";
 
-const clerk = vi.hoisted(() => ({ getToken: vi.fn(async () => "token") }));
-
-vi.mock("@clerk/react", () => ({
-  useAuth: () => ({ getToken: clerk.getToken }),
-  PricingTable: (props: { for: string }) => <div data-testid="pricing-table" data-for={props.for} />,
-}));
-
-const PRO_PLAN = {
+const PRO_PLAN: PlanInfo = {
   plan: "pro",
   features: ["pdf_download", "premium_models", "pro_mode"],
   limit: 200,
   used: 3,
   resets_at: "2026-12-01T00:00:00Z",
 };
+
+/** The workspace on a plan; returns the onUsageChanged spy. */
+function renderWorkspace(plan: PlanInfo = PRO_PLAN) {
+  const onUsageChanged = vi.fn();
+  const view = render(<Workspace plan={plan} onUsageChanged={onUsageChanged} />);
+  return { ...view, onUsageChanged };
+}
 
 const PREFS: Preferences = {
   style: "modern",
@@ -53,7 +53,6 @@ function mockData(baseline: string | null = "# Saved resume") {
     "GET /api/resume/baseline": { body: { content_md: baseline, updated_at: null } },
     "GET /api/history": { body: HISTORY },
     "GET /api/preferences": { body: PREFS },
-    "GET /api/plan": { body: PRO_PLAN },
     "PUT /api/resume/baseline": { body: { content_md: "# New resume", updated_at: "t" } },
     "PUT /api/preferences": { body: { ...PREFS, style: "classic" } },
   });
@@ -61,7 +60,7 @@ function mockData(baseline: string | null = "# Saved resume") {
 
 test("loads baseline, history and preferences on mount", async () => {
   mockData();
-  render(<Workspace />);
+  renderWorkspace();
   const baseline = await screen.findByRole("button", { name: "Baseline resume" });
   expect(baseline).toHaveAttribute("aria-expanded", "false");
   expect(screen.queryByLabelText("Baseline resume content")).not.toBeInTheDocument();
@@ -73,7 +72,7 @@ test("loads baseline, history and preferences on mount", async () => {
 
 test("shows empty baseline when none saved", async () => {
   mockData(null);
-  render(<Workspace />);
+  renderWorkspace();
   await screen.findByLabelText("Tone");
   expect(screen.getByRole("button", { name: "Baseline resume" })).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByText("No resume uploaded yet.")).toBeInTheDocument();
@@ -81,7 +80,7 @@ test("shows empty baseline when none saved", async () => {
 
 test("uploading a resume saves it and shows the saved content", async () => {
   const fetchMock = mockData();
-  const { container } = render(<Workspace />);
+  const { container } = renderWorkspace();
   const baseline = await screen.findByRole("button", { name: "Baseline resume" });
   const input = container.querySelector('input[type="file"]') as HTMLInputElement;
   await userEvent.upload(input, new File(["# New resume"], "resume.md"));
@@ -96,7 +95,7 @@ test("uploading a resume saves it and shows the saved content", async () => {
 
 test("changing a preference saves it without a button", async () => {
   const fetchMock = mockData();
-  render(<Workspace />);
+  renderWorkspace();
   await userEvent.selectOptions(await screen.findByLabelText("Optimization level"), "light");
   await waitFor(() => expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, optimization: "light" }));
 });
@@ -126,7 +125,7 @@ test("a preference changed after the PDF style keeps the new style", async () =>
 
 test("job description is kept as typed", async () => {
   mockData();
-  render(<Workspace />);
+  renderWorkspace();
   const box = screen.getByLabelText("Job description");
   await userEvent.type(box, "Director of Engineering");
   expect(box).toHaveValue("Director of Engineering");
@@ -180,22 +179,23 @@ function lastPreferencesPut(fetchMock: ReturnType<typeof mockData>) {
   return JSON.parse(puts.at(-1)![1]!.body as string);
 }
 
-async function ready() {
-  render(<Workspace />);
+async function ready(plan: PlanInfo = PRO_PLAN) {
+  const { onUsageChanged } = renderWorkspace(plan);
   await screen.findByRole("button", { name: "Baseline resume" });
   await userEvent.type(screen.getByLabelText("Job description"), "Director at Initech");
+  return onUsageChanged;
 }
 
 test("generate is disabled without a job description", async () => {
   mockData();
-  render(<Workspace />);
+  renderWorkspace();
   await screen.findByRole("button", { name: "Baseline resume" });
   expect(screen.getByRole("button", { name: "Generate custom resume" })).toBeDisabled();
 });
 
 test("generate is disabled without a baseline", async () => {
   mockData(null);
-  render(<Workspace />);
+  renderWorkspace();
   await screen.findByLabelText("Tone");
   await userEvent.type(screen.getByLabelText("Job description"), "Director at Initech");
   expect(screen.getByRole("button", { name: "Generate custom resume" })).toBeDisabled();
@@ -292,7 +292,7 @@ test("download records the optimization level that generated the resume, not one
 
 test("changing the optimization level saves it", async () => {
   const fetchMock = mockData();
-  render(<Workspace />);
+  renderWorkspace();
   await userEvent.selectOptions(await screen.findByLabelText("Optimization level"), "full");
   await waitFor(() => expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, optimization: "full" }));
 });
@@ -410,14 +410,14 @@ test("clearing the resume disables download", async () => {
 
 test("changing the phone option saves include_phone", async () => {
   const fetchMock = mockData();
-  render(<Workspace />);
+  renderWorkspace();
   await userEvent.click(await screen.findByRole("checkbox", { name: "Include phone number in generated resume" }));
   await waitFor(() => expect(lastPreferencesPut(fetchMock)).toEqual({ ...PREFS, include_phone: false }));
 });
 
 test("changing experience years saves them", async () => {
   const fetchMock = mockData();
-  render(<Workspace />);
+  renderWorkspace();
   const professional = await screen.findByLabelText("Professional Experience (years)");
   await userEvent.clear(professional);
   await userEvent.type(professional, "8");
@@ -528,7 +528,7 @@ function mockClear(status: number) {
 
 test("clearing history deletes it on the server and empties the list", async () => {
   const fetchMock = mockClear(204);
-  render(<Workspace />);
+  renderWorkspace();
   expect(await screen.findByRole("link", { name: "Download Acme resume" })).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Clear history" }));
   expect(await screen.findByText("No downloads yet.")).toBeInTheDocument();
@@ -539,7 +539,7 @@ test("history stays and the user is told when the server fails to clear it", asy
   mockClear(500);
   const alert = vi.fn();
   vi.stubGlobal("alert", alert);
-  render(<Workspace />);
+  renderWorkspace();
   await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
   await waitFor(() => expect(alert).toHaveBeenCalledWith(CLEAR_FAILED));
   expect(screen.getByRole("link", { name: "Download Acme resume" })).toBeInTheDocument();
@@ -714,7 +714,7 @@ test("when every Pro model fails, the chat notes each one and no resume is shown
 
 test("main panels are ordered: baseline, custom resume, preferences, download history", async () => {
   mockData();
-  render(<Workspace />);
+  renderWorkspace();
   await screen.findByLabelText("Tone");
   const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
   expect(headings.filter((h) => h !== "AI assistant")).toEqual([
@@ -740,28 +740,18 @@ test("clearing the conversation empties the chat, keeps the resume, and starts t
   expect(generateBodies(fetchMock)[1].history).toEqual([]);
 });
 
-const FREE_PLAN = { plan: "free", features: [], limit: 5, used: 5, resets_at: "2026-12-01T00:00:00Z" };
+const FREE_PLAN: PlanInfo = { plan: "free", features: [], limit: 5, used: 5, resets_at: "2026-12-01T00:00:00Z" };
 
-/** Answer GET /api/plan with each plan in turn (the last one repeats). */
-function mockPlans(fetchMock: ReturnType<typeof mockData>, ...plans: object[]) {
-  const base = fetchMock.getMockImplementation()!;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
-    url === "/api/plan" ? Response.json(plans.length > 1 ? plans.shift() : plans[0]) : base(url, init),
-  );
-}
-
-function planRequests(fetchMock: ReturnType<typeof mockData>) {
-  return fetchMock.mock.calls.filter(([url]) => url === "/api/plan").length;
-}
-
-test("the chat shows this month's usage and refreshes it after each generation", async () => {
-  const fetchMock = mockChat({ body: RESUME_RESULT });
-  mockPlans(fetchMock, PRO_PLAN, { ...PRO_PLAN, used: 4 });
-  await ready();
-  expect(await screen.findByText("3 of 200 resumes this month · Pro plan")).toBeInTheDocument();
+test("after each generation, successful or not, the parent is told to reload the plan", async () => {
+  mockChat({ body: RESUME_RESULT }, { status: 429, body: { detail: "Limit reached." } });
+  const onUsageChanged = await ready();
+  expect(onUsageChanged).not.toHaveBeenCalled();
   await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
-  expect(await screen.findByText("4 of 200 resumes this month · Pro plan")).toBeInTheDocument();
-  expect(planRequests(fetchMock)).toBe(2);
+  await screen.findByText(RESUME_RESULT.reply);
+  expect(onUsageChanged).toHaveBeenCalledTimes(1);
+  await userEvent.type(screen.getByLabelText("Message"), "Again{Enter}");
+  await screen.findByText("Limit reached.");
+  expect(onUsageChanged).toHaveBeenCalledTimes(2);
 });
 
 test("a generation blocked by the plan shows the backend's reason in the chat", async () => {
@@ -781,24 +771,9 @@ test("other failures keep the generic message", () => {
   );
 });
 
-test("Plans opens Clerk's pricing table; closing it refreshes the session token, then the plan", async () => {
-  const fetchMock = mockData();
-  mockPlans(fetchMock, FREE_PLAN, { ...PRO_PLAN, used: 5 });
-  render(<Workspace />);
-  await userEvent.click(await screen.findByRole("button", { name: "Plans" }));
-  const dialog = screen.getByRole("dialog", { name: "Plans" });
-  expect(within(dialog).getByTestId("pricing-table")).toHaveAttribute("data-for", "user");
-  await userEvent.click(within(dialog).getByRole("button", { name: "Close" }));
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(clerk.getToken).toHaveBeenCalledWith({ skipCache: true });
-  expect(await screen.findByText("5 of 200 resumes this month · Pro plan")).toBeInTheDocument();
-});
-
 test("on the free plan, PDF download and re-download are disabled", async () => {
-  const fetchMock = mockChat({ body: RESUME_RESULT });
-  mockPlans(fetchMock, FREE_PLAN);
-  await ready();
-  await screen.findByText("5 of 5 resumes this month · Free plan");
+  mockChat({ body: RESUME_RESULT });
+  await ready(FREE_PLAN);
   await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
   expect(await screen.findByRole("button", { name: "Download PDF" })).toBeDisabled();
   expect(screen.queryByRole("link", { name: "Download Acme resume" })).not.toBeInTheDocument();

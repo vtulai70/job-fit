@@ -1,6 +1,5 @@
 "use client";
 
-import { useAuth } from "@clerk/react";
 import { useEffect, useRef, useState } from "react";
 
 import * as api from "@/lib/api";
@@ -9,7 +8,6 @@ import ChatSidebar from "./ChatSidebar";
 import CustomResume, { type CustomResumeData } from "./CustomResume";
 import HistoryPanel from "./HistoryPanel";
 import JobDescription from "./JobDescription";
-import PlansDialog from "./PlansDialog";
 import PreferencesPanel from "./PreferencesPanel";
 import ResumePanel from "./ResumePanel";
 
@@ -85,7 +83,11 @@ function proFields({ pro, selected }: Generated): Partial<api.ProFields> {
 }
 
 /** Signed-in workspace: loads and saves the user's data and runs the AI chat (after pending preference saves). */
-export default function Workspace() {
+/** plan: the user's plan (loaded by the parent); onUsageChanged: called after each generation so the parent
+ * reloads it. */
+type Props = { plan: api.PlanInfo | null; onUsageChanged: () => void };
+
+export default function Workspace({ plan, onUsageChanged }: Props) {
   /** undefined while loading, so the baseline panel can start collapsed when one is saved. */
   const [baseline, setBaseline] = useState<string | null | undefined>(undefined);
   const [jobDescription, setJobDescription] = useState("");
@@ -94,10 +96,7 @@ export default function Workspace() {
   const [prefs, setPrefs] = useState<api.Preferences | null>(null);
   const [messages, setMessages] = useState<api.ChatEntry[]>([]);
   const [busy, setBusy] = useState(false);
-  const [plan, setPlan] = useState<api.PlanInfo | null>(null);
-  const [plansOpen, setPlansOpen] = useState(false);
   const prefsSaved = useRef<Promise<unknown>>(Promise.resolve());
-  const { getToken } = useAuth();
   const features = plan?.features ?? [];
   const canDownload = features.includes("pdf_download");
 
@@ -105,15 +104,7 @@ export default function Workspace() {
     api.getBaseline().then((b) => setBaseline(b.content_md));
     api.listHistory().then(setHistory);
     api.getPreferences().then(setPrefs);
-    api.getPlan().then(setPlan);
   }, []);
-
-  /** After the pricing table closes: get a fresh session token (it carries the plan), then reload the plan. */
-  async function closePlans() {
-    setPlansOpen(false);
-    await getToken({ skipCache: true });
-    setPlan(await api.getPlan());
-  }
 
   async function uploadBaseline(content: string) {
     setBaseline((await api.putBaseline(content)).content_md);
@@ -155,7 +146,7 @@ export default function Workspace() {
       setMessages([...sent, { role: "assistant", content: failureReply(error) }]);
     } finally {
       setBusy(false);
-      api.getPlan().then(setPlan);
+      onUsageChanged();
     }
   }
 
@@ -216,10 +207,7 @@ export default function Workspace() {
         onSend={send}
         onGenerate={() => send(GENERATE_MESSAGE)}
         onClear={() => setMessages([])}
-        usage={plan}
-        onPlans={() => setPlansOpen(true)}
       />
-      {plansOpen && <PlansDialog onClose={closePlans} />}
     </div>
   );
 }

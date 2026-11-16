@@ -323,7 +323,7 @@ Add subscription plans with Clerk Billing for individual users: a free plan and 
 
 | | Free (default, `free`) | Basic (`basic`) | Pro (`pro`) |
 |---|---|---|---|
-| Price | $0 | $10/month (1-day free trial) | $30/month |
+| Price | $0 | $10/month | $30/month |
 | Resumes per month | 5 | 50 | 200 |
 | PDF download / re-download (`pdf_download`) | no | yes | yes |
 | Premium models (`premium_models`): `anthropic/claude-opus-5.5`, `anthropic/claude-sonnet-5.5`, `openai/gpt-6-sol`, `google/gemini-4-argon` | no | no | yes |
@@ -343,7 +343,7 @@ Add subscription plans with Clerk Billing for individual users: a free plan and 
 **Dashboard setup (user)**
 - [x] Enable Billing for users (Billing settings)
 - [x] Create Features `pdf_download`, `premium_models`, `pro_mode`
-- [x] Check the free default plan's key (`free`); create Basic (`basic`: `pdf_download`, $10/month, 1-day trial) and Pro (`pro`: `pdf_download`, `premium_models`, `pro_mode`, $30/month), publicly available (verified through the Backend API `GET /v1/billing/plans?payer_type=user`)
+- [x] Check the free default plan's key (`free`); create Basic (`basic`: `pdf_download`, $10/month; its 1-day trial was later switched off in the Dashboard) and Pro (`pro`: `pdf_download`, `premium_models`, `pro_mode`, $30/month), publicly available (verified through the Backend API `GET /v1/billing/plans?payer_type=user`)
 
 **Substeps**
 - [x] Backend entitlements: a `Plan` dependency built from the verified session token claims `pla` (e.g. `u:pro`, scope prefix removed; missing means `free`) and `fea` (comma-separated `u:feature` items); tests override it like `current_user`
@@ -351,11 +351,11 @@ Add subscription plans with Clerk Billing for individual users: a free plan and 
 - [x] Enforce in `/api/generate`: premium model without `premium_models` -> 403; Pro mode without `pro_mode` -> 403; limit reached -> 429 (checked before any AI call; for Pro mode the remaining allowance must cover every selected Pro model); premium models are `PREMIUM_MODELS` in `app/ai.py`, and in Pro mode the AI model and every Pro model are checked
 - [x] Enforce in history: `POST /api/history` and `GET /api/history/{id}/pdf` need `pdf_download` (403)
 - [x] Frontend plans: a "Plans" button in the header opening `<PricingTable />`; subscriptions are managed in the account menu's Billing tab (`UserProfile`); after checkout, refresh the session token and `/api/plan` so the new plan applies (verify how quickly the `pla`/`fea` claims update)
-- [x] Frontend gating, via `useAuth().has({ feature })` and `/api/plan`: premium models and Pro mode disabled and marked "Pro plan"; Download PDF and history re-download disabled with "Basic or Pro plan"; a usage line in the chat sidebar ("3 of 5 resumes this month"); the chat shows the backend's message for 403/429 instead of the generic error
+- [x] Frontend gating, via `useAuth().has({ feature })` and `/api/plan`: premium models and Pro mode disabled and marked "Pro plan"; Download PDF and history re-download disabled with "Basic or Pro plan"; a usage line in the title bar ("3 of 5 resumes this month"); the chat shows the backend's message for 403/429 instead of the generic error
 - [x] Docs: CLAUDE.md files, `docs/DATABASE.md`, `docs/schema.json`, README
 
 **Implementation notes**
-- The Plans button and usage line are at the top of the AI chat sidebar (not the header): the plan state lives in `Workspace`, next to the monthly limit it explains
+- The Plans button and usage line are in the app title bar, left of the account menu (first placed in the AI chat sidebar, then moved); the plan state lives in `SignedIn`, which renders `Header` and `Workspace`
 - Frontend gating uses the features from `GET /api/plan` (backend-verified) rather than `useAuth().has()`
 - Real tokens checked through the Backend API: a Free user has `pla: "u:free"` and no `fea`; a Pro user `pla: "u:pro"`, `fea: "u:pdf_download,u:premium_models,u:pro_mode"`
 - A checkout's Continue reloads the page, so the new plan applies at once (checked live by upgrading a test user from Basic to Pro); closing the Plans dialog also refreshes the session token and the plan

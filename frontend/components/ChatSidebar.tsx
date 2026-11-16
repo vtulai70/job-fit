@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { type ChatEntry, type PlanInfo, planName } from "@/lib/api";
+import type { ChatEntry } from "@/lib/api";
 
 type Props = {
   messages: ChatEntry[];
@@ -16,9 +16,6 @@ type Props = {
   onGenerate: () => void;
   /** Empty the conversation (the next turn starts a new one with the AI). */
   onClear: () => void;
-  /** The plan and this month's usage, once loaded. */
-  usage: PlanInfo | null;
-  onPlans: () => void;
 };
 
 /** AI chat: conversation, a one-click generate button and a free-text message box. */
@@ -31,8 +28,6 @@ export default function ChatSidebar({
   onSend,
   onGenerate,
   onClear,
-  usage,
-  onPlans,
 }: Props) {
   const [text, setText] = useState("");
 
@@ -56,16 +51,6 @@ export default function ChatSidebar({
           </button>
         )}
       </div>
-      {usage && (
-        <div className="mb-3 flex items-center justify-between text-xs text-ink/60">
-          <span>
-            {usage.used} of {usage.limit} resumes this month · {planName(usage.plan)} plan
-          </span>
-          <button onClick={onPlans} className="text-sm font-semibold text-primary hover:underline">
-            Plans
-          </button>
-        </div>
-      )}
       <button
         onClick={onGenerate}
         disabled={!ready || !canGenerate || busy}

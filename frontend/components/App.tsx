@@ -2,8 +2,7 @@
 
 import { ClerkProvider, Show, SignIn } from "@clerk/react";
 
-import Header from "./Header";
-import Workspace from "./Workspace";
+import SignedIn from "./SignedIn";
 
 const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -29,10 +28,7 @@ export default function App() {
         </div>
       </Show>
       <Show when="signed-in">
-        <div className="flex h-screen flex-col">
-          <Header />
-          <Workspace />
-        </div>
+        <SignedIn />
       </Show>
     </ClerkProvider>
   );
