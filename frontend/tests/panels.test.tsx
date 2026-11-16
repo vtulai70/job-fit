@@ -274,9 +274,13 @@ test("history cap is applied when the panel is expanded again", async () => {
   expect(screen.getByRole("list").style.maxHeight).toBe("370px");
 });
 
-const LEVELS = ["Light polish", "Smart integration", "Full tailoring"];
+const LEVELS = [
+  "Light polish - adds the job's skills, keeps your wording",
+  "Smart integration - weaves the job's skills into your work history",
+  "Full tailoring - rewrites and reorders the content for the job",
+];
 
-test("optimization level lists the three levels and shows the saved one with its description", () => {
+test("optimization level lists the three levels with a short summary each, and the saved one with its description", () => {
   render(<Stateful initial={{ ...PREFS, optimization: "full" }} onChange={vi.fn()} />);
   const select = screen.getByLabelText("Optimization level");
   expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(LEVELS);
@@ -425,4 +429,23 @@ test("history details end with the judge and rank of a Pro download", () => {
     "Pro: judged by anthropic/claude-opus-5.5, rank 2",
   );
   expect(historyDetails(RECORDED).join(" ")).not.toContain("Pro:");
+});
+
+test("preferences are ordered: model, Pro, optimization, tone, notes, experience, checkboxes, max pages", () => {
+  render(<Stateful initial={PREFS} onChange={vi.fn()} />);
+  const controls = [...document.querySelectorAll("input, select, textarea")].map(
+    (el) => el.closest("label")!.textContent!.trim().split("\n")[0],
+  );
+  expect(controls.map((text) => text.replace(/(AI model|Optimization level)[\s\S]*/, "$1"))).toEqual([
+    "AI model",
+    "Pro mode",
+    "Optimization level",
+    "Tone",
+    "Notes for the AI",
+    "Professional Experience (years)",
+    "Earlier Experience (years)",
+    "Include phone number in generated resume",
+    GRADUATION,
+    "Max pages",
+  ]);
 });

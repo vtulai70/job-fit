@@ -124,7 +124,7 @@ export default function PreferencesPanel({ prefs, onChange }: Props) {
             >
               {OPTIMIZATION_LEVELS.map((level) => (
                 <option key={level.value} value={level.value}>
-                  {level.label}
+                  {level.label} - {level.summary}
                 </option>
               ))}
             </select>
@@ -132,6 +132,24 @@ export default function PreferencesPanel({ prefs, onChange }: Props) {
           <p id="optimization-description" className="-mt-1 text-xs text-ink/60">
             {OPTIMIZATION_LEVELS.find((level) => level.value === prefs.optimization)!.description}
           </p>
+          <label className="text-sm">
+            Tone
+            <input
+              value={prefs.tone}
+              onChange={(e) => update({ tone: e.target.value })}
+              placeholder="e.g. concise, metrics-driven"
+              className={inputClass}
+            />
+          </label>
+          <label className="text-sm">
+            Notes for the AI
+            <textarea
+              value={prefs.notes}
+              onChange={(e) => update({ notes: e.target.value })}
+              rows={3}
+              className={inputClass}
+            />
+          </label>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <label>
               Professional Experience (years)
@@ -160,6 +178,26 @@ export default function PreferencesPanel({ prefs, onChange }: Props) {
             Recent roles get full detail; earlier ones are condensed; older ones are left out. 0 earlier years means
             no Earlier Experience section.
           </p>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={prefs.include_phone}
+                onChange={(e) => update({ include_phone: e.target.checked })}
+                className="h-4 w-4 accent-primary"
+              />
+              Include phone number in generated resume
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={prefs.include_graduation_year}
+                onChange={(e) => update({ include_graduation_year: e.target.checked })}
+                className="h-4 w-4 accent-primary"
+              />
+              Include university graduation year in generated resume
+            </label>
+          </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <label>
               Max pages
@@ -173,42 +211,6 @@ export default function PreferencesPanel({ prefs, onChange }: Props) {
               />
             </label>
           </div>
-          <label className="text-sm">
-            Tone
-            <input
-              value={prefs.tone}
-              onChange={(e) => update({ tone: e.target.value })}
-              placeholder="e.g. concise, metrics-driven"
-              className={inputClass}
-            />
-          </label>
-          <label className="text-sm">
-            Notes for the AI
-            <textarea
-              value={prefs.notes}
-              onChange={(e) => update({ notes: e.target.value })}
-              rows={3}
-              className={inputClass}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={prefs.include_phone}
-              onChange={(e) => update({ include_phone: e.target.checked })}
-              className="h-4 w-4 accent-primary"
-            />
-            Include phone number in generated resume
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={prefs.include_graduation_year}
-              onChange={(e) => update({ include_graduation_year: e.target.checked })}
-              className="h-4 w-4 accent-primary"
-            />
-            Include university graduation year in generated resume
-          </label>
         </div>
       )}
     </section>

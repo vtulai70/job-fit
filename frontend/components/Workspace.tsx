@@ -180,8 +180,8 @@ export default function Workspace() {
           onStyleChange={(style) => savePreferences({ ...prefs!, style })}
           onDownload={downloadCustomResume}
         />
-        <HistoryPanel entries={history} onClear={clearHistory} />
         {prefs && <PreferencesPanel prefs={prefs} onChange={savePreferences} />}
+        <HistoryPanel entries={history} onClear={clearHistory} />
       </main>
       <ChatSidebar
         messages={messages}

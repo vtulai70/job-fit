@@ -23,21 +23,25 @@ export type Model = (typeof MODELS)[number];
 export const PRO_MIN_MODELS = 2;
 export const PRO_MAX_MODELS = 4;
 
-/** How much the AI changes the resume; values match `Optimization` in the backend. */
+/** How much the AI changes the resume; values match `Optimization` in the backend. `summary` follows the label in the
+ * drop-down; `description` is shown under it for the chosen level. */
 export const OPTIMIZATION_LEVELS = [
   {
     value: "light",
     label: "Light polish",
+    summary: "adds the job's skills, keeps your wording",
     description: "Adds the skills and requirements to the resume and keeps the original context intact.",
   },
   {
     value: "smart",
     label: "Smart integration",
+    summary: "weaves the job's skills into your work history",
     description: "Naturally integrates the skills and requirements into the work history to make a stronger impression.",
   },
   {
     value: "full",
     label: "Full tailoring",
+    summary: "rewrites and reorders the content for the job",
     description: "Fully rewrites and reprioritizes the content to match exactly what the employer is looking for.",
   },
 ] as const;

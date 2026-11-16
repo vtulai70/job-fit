@@ -191,3 +191,17 @@ test("history shows at most 10 entries and scrolls for more", async ({ page }) =
   expect(last.y).toBeGreaterThanOrEqual(box.y - 1);
   expect(last.y + last.height).toBeLessThanOrEqual(box.y + box.height + 1);
 });
+
+test("phone and graduation year checkboxes share a line, with max pages below them", async ({ page }) => {
+  await signIn(page);
+  const phone = (await page.getByRole("checkbox", { name: "Include phone number in generated resume" }).boundingBox())!;
+  const graduation = (await page
+    .getByRole("checkbox", { name: "Include university graduation year in generated resume" })
+    .boundingBox())!;
+  const earlier = (await page.getByLabel("Earlier Experience (years)").boundingBox())!;
+  const maxPages = (await page.getByLabel("Max pages").boundingBox())!;
+  expect(Math.abs(phone.y - graduation.y)).toBeLessThan(2);
+  expect(graduation.x).toBeGreaterThan(phone.x);
+  expect(phone.y).toBeGreaterThan(earlier.y);
+  expect(maxPages.y).toBeGreaterThan(phone.y);
+});

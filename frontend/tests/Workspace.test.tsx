@@ -687,3 +687,16 @@ test("when every Pro model fails, the chat notes each one and no resume is shown
   expect(screen.getByText(failureNote(NO_RESUME))).toBeInTheDocument();
   expect(screen.queryByLabelText("Custom resume content")).not.toBeInTheDocument();
 });
+
+test("main panels are ordered: baseline, custom resume, preferences, download history", async () => {
+  mockData();
+  render(<Workspace />);
+  await screen.findByLabelText("Tone");
+  const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+  expect(headings.filter((h) => h !== "AI assistant")).toEqual([
+    "Baseline resume",
+    "Custom resume",
+    "Preferences",
+    "Download history",
+  ]);
+});
