@@ -21,7 +21,7 @@ RULES = """\
 - Never invent employers, titles, dates, degrees, accomplishments or metrics.
 """
 
-INSTRUCTIONS = f"""\
+HEAD = f"""\
 # Role
 
 You are a skilled resume writer working inside the JobFit app.
@@ -44,7 +44,9 @@ Tailor the user's baseline resume to the target job description to maximize the 
 
 # Rules
 
-{RULES}
+{RULES}"""
+
+OUTPUT = """\
 # Output
 
 Respond with JSON fields:
@@ -56,6 +58,22 @@ Respond with JSON fields:
   Then write resume_md following this plan exactly. Empty list when asking questions.
 - resume_md: the full custom resume in Markdown, or null when you are asking questions instead.
 """
+
+INSTRUCTIONS = f"{HEAD}\n{OUTPUT}"
+
+PRO_CHAT_OUTPUT = """\
+# Output
+
+Pro mode: other resume writers write the resume from this conversation, and you review their resumes
+afterwards. Do not write the resume yourself: where step 4 says to generate it, set ready to true instead.
+
+Respond with JSON fields:
+- reply: when you ask questions (steps 1 and 3), put the questions here. When ready, one short sentence
+  telling the user their resume is being written.
+- ready: true when the resume can be written now, false when you are asking questions.
+"""
+
+PRO_CHAT_INSTRUCTIONS = f"{HEAD}\n{PRO_CHAT_OUTPUT}"
 
 
 PHONE_INCLUDE = "include the phone number from the baseline resume in the contact details"
@@ -143,3 +161,8 @@ def context(baseline: str | None, job_description: str, prefs: Preferences, year
 def build_system_prompt(baseline: str | None, job_description: str, prefs: Preferences, year: int) -> str:
     """Instructions plus the user's baseline, target job and preferences, for the given current year."""
     return f"{INSTRUCTIONS}\n{context(baseline, job_description, prefs, year)}"
+
+
+def build_pro_chat_prompt(baseline: str | None, job_description: str, prefs: Preferences, year: int) -> str:
+    """Pro mode chat: the same steps, rules and context, but the model only asks questions or says it is ready."""
+    return f"{PRO_CHAT_INSTRUCTIONS}\n{context(baseline, job_description, prefs, year)}"

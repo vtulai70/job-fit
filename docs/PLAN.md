@@ -256,7 +256,7 @@ Add a "Pro mode" in which the baseline resume, job description and preferences g
 - 2 to 4 candidate models, chosen from the full model list (no restriction to cheaper models)
 - The judge model cannot also be a candidate (checked in the frontend and validated in the backend)
 - Pro starts automatically: with Pro mode on, a chat turn that produces a resume (including the one started by "Generate custom resume") runs Pro instead of a single generation
-- The clarifying-question chat stays with the "AI model" preference. Once that model answers with a resume instead of questions, the Pro candidates run, each with the same conversation plus an instruction to write the resume now without asking questions. The chat model's own resume is discarded. So a Pro turn takes one chat turn, plus the slowest candidate, plus the judge
+- The clarifying-question chat stays with the "AI model" preference. Once that model answers with a resume instead of questions, the Pro candidates run, each with the same conversation plus an instruction to write the resume now without asking questions. The chat model's own resume is discarded. So a Pro turn takes one chat turn, plus the slowest candidate, plus the judge. Changed after implementation: in Pro mode the AI model writes no resume, it only asks questions or says it is ready (`{reply, ready}`), so no resume is wasted
 - The judge sees the candidates labelled A/B/C/D, in shuffled order and without model names, so it cannot favour a model by name or position
 - Only the downloaded candidate is saved to the history. The others are discarded, keeping the "persisted on download" rule
 
@@ -311,4 +311,56 @@ Add a "Pro mode" in which the baseline resume, job description and preferences g
 **Success criteria**
 - With Pro mode on, "Generate custom resume" returns 2-4 ranked candidates with the judge's verdict, and any of them can be edited and downloaded
 - With Pro mode off, the app behaves exactly as before
+- All tests pass
+
+---
+
+## Step 12: Subscription plans (Clerk Billing)
+
+Add subscription plans with Clerk Billing for individual users: a free plan and two paid tiers. Plans and features are defined in the Clerk Dashboard; the backend reads them from the verified session token and enforces them, and the frontend shows the pricing table and what each plan unlocks.
+
+**Plans**
+
+| | Free (default, `free`) | Basic (`basic`) | Pro (`pro`) |
+|---|---|---|---|
+| Price | $0 | $10/month (1-day free trial) | $30/month |
+| Resumes per month | 5 | 50 | 200 |
+| PDF download / re-download (`pdf_download`) | no | yes | yes |
+| Premium models (`premium_models`): `anthropic/claude-opus-5.5`, `anthropic/claude-sonnet-5.5`, `openai/gpt-6-sol`, `google/gemini-4-argon` | no | no | yes |
+| Pro mode (`pro_mode`) | no | no | yes |
+
+**Decisions**
+- Billing is per user (no Organizations)
+- Only resumes produced count against the monthly limit: a normal generation counts 1; a Pro mode run counts once per Pro model that returned a resume (failed ones are not counted). Clarifying questions, the Pro mode ready check and the judge are free. A Pro mode run starts only if the remaining allowance covers every Pro model selected (otherwise 429, naming how many are needed and left). Months are calendar months in UTC
+- Why these limits (measured 2026-11-16, one real generation per model with `resume.md`, OpenRouter prices): cost per resume is gpt-oss-120b $0.0007, gpt-5.4-nano $0.0024, claude-haiku-5.5 $0.0038, gemini-3.8-flash $0.018, gpt-6-sol $0.022, gemini-4-argon $0.027, claude-sonnet-5.5 $0.048, claude-opus-5.5 $0.092; a judge call is estimated at $0.002 (gpt-oss) to $0.06 (Opus). After Stripe (2.9% + $0.30) and Clerk (0.7%) fees, Basic nets about $9.30 and Pro about $28.60. Worst cases: Basic, 50 resumes on the costliest non-premium model (gemini-3.8-flash) is about $0.92; Pro, 200 resumes on Opus is about $18, and 50 Pro mode runs with four premium writers (counted 4 each) is about $9-13. With 500 resumes and Pro mode counted once, Pro could cost $46-$135 a month
+- Sonnet is premium because it costs more per resume than GPT-6 Sol and Gemini 4 Argon
+- Pro mode's AI model writes no resume of its own (it only asks questions or says it is ready; done in Step 11), so a Pro run costs the Pro models' resumes, a short ready check and the judge
+- Monthly limits are kept in the backend by plan key (Clerk has no usage quotas); access to PDFs, premium models and Pro mode uses Clerk Features
+- After a downgrade, history stays visible but PDF re-download needs a paid plan; nothing is deleted
+- The backend enforces every rule; the frontend only explains and disables. Blocked requests return 403 (feature missing) or 429 (monthly limit reached) with a message for the user
+- Development uses Clerk's test payment gateway; production needs the user's own Stripe account. Clerk Billing is USD only, has no tax/VAT handling, no refunds in Clerk, and charges 0.7% per transaction plus Stripe fees
+
+**Dashboard setup (user)**
+- [x] Enable Billing for users (Billing settings)
+- [x] Create Features `pdf_download`, `premium_models`, `pro_mode`
+- [x] Check the free default plan's key (`free`); create Basic (`basic`: `pdf_download`, $10/month, 1-day trial) and Pro (`pro`: `pdf_download`, `premium_models`, `pro_mode`, $30/month), publicly available (verified through the Backend API `GET /v1/billing/plans?payer_type=user`)
+
+**Substeps**
+- [ ] Backend entitlements: a `Plan` dependency built from the verified session token claims `pla` (e.g. `u:pro`, scope prefix removed; missing means `free`) and `fea` (comma-separated `u:feature` items); tests override it like `current_user`
+- [ ] Usage: `generations` table (user, timestamp, model, pro) with an index on (user, generated_at); a row is added when `/api/generate` returns a resume; `MONTHLY_GENERATIONS = {"free": 5, "basic": 50, "pro": 200}`; a Pro mode run adds one row per Pro model that returned a resume; `GET /api/plan` returns plan, features, used this month, limit and the reset date
+- [ ] Enforce in `/api/generate`: premium model without `premium_models` -> 403; Pro mode without `pro_mode` -> 403; limit reached -> 429 (checked before any AI call; for Pro mode the remaining allowance must cover every selected Pro model); premium models are `PREMIUM_MODELS` in `app/ai.py`, and in Pro mode the AI model and every Pro model are checked
+- [ ] Enforce in history: `POST /api/history` and `GET /api/history/{id}/pdf` need `pdf_download` (403)
+- [ ] Frontend plans: a "Plans" button in the header opening `<PricingTable />`; subscriptions are managed in the account menu's Billing tab (`UserProfile`); after checkout, refresh the session token and `/api/plan` so the new plan applies (verify how quickly the `pla`/`fea` claims update)
+- [ ] Frontend gating, via `useAuth().has({ feature })` and `/api/plan`: premium models and Pro mode disabled and marked "Pro plan"; Download PDF and history re-download disabled with "Basic or Pro plan"; a usage line in the chat sidebar ("3 of 5 resumes this month"); the chat shows the backend's message for 403/429 instead of the generic error
+- [ ] Docs: CLAUDE.md files, `docs/DATABASE.md`, `docs/schema.json`, README
+
+**Tests**
+- Backend unit (plan overridden): claim parsing (`u:` prefix, missing claims), each 403 and 429 path (including a premium model used only as a Pro model, and a Pro run larger than the remaining allowance), usage counted only for resumes and once per Pro model that returned one, monthly reset boundary, `GET /api/plan`, history gating including re-download after a downgrade
+- Frontend unit: gated controls per plan, usage line, 403/429 messages in the chat, Plans button shows the pricing table
+- E2E: the Clerk test users are on the free plan: free limits and gates (no PDF download, premium models and Pro mode disabled, the 6th resume in a month is blocked)
+- Manual: subscribe to Basic and Pro through the test gateway with Clerk's test card and check the gates lift without a reload (or after the refresh step)
+
+**Success criteria**
+- Free, Basic and Pro users get exactly the access in the table, enforced by the backend
+- Users can subscribe, upgrade, downgrade and cancel from the app
 - All tests pass

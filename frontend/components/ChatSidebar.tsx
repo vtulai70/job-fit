@@ -14,10 +14,12 @@ type Props = {
   canGenerate: boolean;
   onSend: (text: string) => void;
   onGenerate: () => void;
+  /** Empty the conversation (the next turn starts a new one with the AI). */
+  onClear: () => void;
 };
 
 /** AI chat: conversation, a one-click generate button and a free-text message box. */
-export default function ChatSidebar({ messages, busy, busyText, ready, canGenerate, onSend, onGenerate }: Props) {
+export default function ChatSidebar({ messages, busy, busyText, ready, canGenerate, onSend, onGenerate, onClear }: Props) {
   const [text, setText] = useState("");
 
   function submit(event: React.FormEvent) {
@@ -28,7 +30,18 @@ export default function ChatSidebar({ messages, busy, busyText, ready, canGenera
 
   return (
     <aside aria-label="AI chat" className="flex w-96 flex-col border-l border-line bg-surface p-4">
-      <h2 className="mb-2 font-semibold">AI assistant</h2>
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="font-semibold">AI assistant</h2>
+        {messages.length > 0 && (
+          <button
+            onClick={onClear}
+            disabled={busy}
+            className="rounded border border-line px-3 py-1 text-sm hover:border-primary hover:text-primary disabled:opacity-40"
+          >
+            Clear conversation
+          </button>
+        )}
+      </div>
       <button
         onClick={onGenerate}
         disabled={!ready || !canGenerate || busy}

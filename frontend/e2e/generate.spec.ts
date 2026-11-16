@@ -305,3 +305,24 @@ test("PDF style is chosen in the Custom resume header, persists, and styles the 
   await page.getByLabel("PDF style").selectOption("professional");
   expect((await reset).ok()).toBe(true);
 });
+
+test("Clear conversation empties the chat and keeps the generated resume", async ({ page }) => {
+  const bodies = await mockGenerate(page, [
+    { reply: "Here you go.", company: "Umbrella Corp", resume_md: TAILORED },
+    { reply: "Fresh start.", company: "Umbrella Corp", resume_md: null },
+  ]);
+  await prepare(page);
+  await page.getByRole("button", { name: "Generate custom resume" }).click();
+  const chat = page.getByRole("log", { name: "Conversation" });
+  await expect(chat.getByText("Here you go.")).toBeVisible();
+  const sidebar = page.getByRole("complementary", { name: "AI chat" });
+  await sidebar.getByRole("button", { name: "Clear conversation" }).click();
+  await expect(chat).toHaveText("Ask anything about tailoring your resume.");
+  await expect(sidebar.getByRole("button", { name: "Clear conversation" })).toHaveCount(0);
+  await expect(page.getByLabel("Custom resume content")).toHaveValue(TAILORED);
+
+  await page.getByLabel("Message").fill("Start over");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(chat.getByText("Fresh start.")).toBeVisible();
+  expect(bodies[1].history).toEqual([]);
+});

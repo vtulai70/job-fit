@@ -191,6 +191,7 @@ export default function Workspace() {
         canGenerate={Boolean(baseline && jobDescription.trim())}
         onSend={send}
         onGenerate={() => send(GENERATE_MESSAGE)}
+        onClear={() => setMessages([])}
       />
     </div>
   );

@@ -13,6 +13,7 @@ function renderChat(overrides = {}) {
     canGenerate: true,
     onSend: vi.fn(),
     onGenerate: vi.fn(),
+    onClear: vi.fn(),
     ...overrides,
   };
   render(<ChatSidebar {...props} />);
@@ -87,4 +88,22 @@ test("before preferences load, generate and send are disabled", async () => {
   await userEvent.type(screen.getByLabelText("Message"), "hi{Enter}");
   expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
   expect(onSend).not.toHaveBeenCalled();
+});
+
+test("Clear conversation shows only with messages and is disabled while busy", async () => {
+  const { unmount } = render(
+    <ChatSidebar messages={[]} busy={false} busyText="" ready canGenerate onSend={vi.fn()} onGenerate={vi.fn()} onClear={vi.fn()} />,
+  );
+  expect(screen.queryByRole("button", { name: "Clear conversation" })).not.toBeInTheDocument();
+  unmount();
+  const messages = [{ role: "user" as const, content: "hi" }];
+  const busy = renderChat({ messages, busy: true });
+  expect(screen.getByRole("button", { name: "Clear conversation" })).toBeDisabled();
+  expect(busy.onClear).not.toHaveBeenCalled();
+});
+
+test("Clear conversation calls onClear", async () => {
+  const props = renderChat({ messages: [{ role: "user", content: "hi" }] });
+  await userEvent.click(screen.getByRole("button", { name: "Clear conversation" }));
+  expect(props.onClear).toHaveBeenCalledOnce();
 });

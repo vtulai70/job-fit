@@ -4,7 +4,7 @@ import { expect, test, vi } from "vitest";
 
 import CustomResume from "@/components/CustomResume";
 import JobDescription from "@/components/JobDescription";
-import ResumePanel from "@/components/ResumePanel";
+import ResumePanel, { FORMAT_NOTE } from "@/components/ResumePanel";
 
 test("resume panel shows empty state", () => {
   render(<ResumePanel content={null} onUpload={vi.fn()} />);
@@ -166,4 +166,15 @@ test("the PDF style select sits left of the Markdown / Preview toggle and report
 test("no PDF style select before a resume is generated", () => {
   render(<CustomResume {...PREVIEW} resume={null} onChange={vi.fn()} onDownload={vi.fn()} />);
   expect(screen.queryByLabelText("PDF style")).not.toBeInTheDocument();
+});
+
+test("baseline panel notes the resume should be in an AI-friendly format like Markdown, while expanded", async () => {
+  const { unmount } = render(<ResumePanel content={null} onUpload={vi.fn()} />);
+  expect(screen.getByText(FORMAT_NOTE)).toBeInTheDocument();
+  expect(FORMAT_NOTE).toContain("Markdown (.md)");
+  unmount();
+  render(<ResumePanel content="# Jane Doe" onUpload={vi.fn()} />);
+  expect(screen.queryByText(FORMAT_NOTE)).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Baseline resume" }));
+  expect(screen.getByText(FORMAT_NOTE)).toBeInTheDocument();
 });

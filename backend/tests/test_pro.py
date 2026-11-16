@@ -1,6 +1,7 @@
 import re
 import threading
 from datetime import date
+from typing import get_args
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -9,10 +10,12 @@ import pytest
 from openai import APITimeoutError
 
 from app import ai
+from app.ai import Model
 from app.main import app
 from app.pro import NO_CANDIDATES, CANDIDATE_TIMEOUT, WRITE_NOW, Candidate, Review, Verdict, judge, run_pro, verdict_schema
-from app.prompt import build_system_prompt, context
-from app.routes.generate import GenerateResult, build_messages
+from app.prompt import build_pro_chat_prompt, build_system_prompt, context
+from app.prompt import INSTRUCTIONS, PRO_CHAT_INSTRUCTIONS
+from app.routes.generate import GenerateResult, ProChatResult, build_messages
 from app.routes.preferences import Preferences
 from tests.test_generate import JOB, RESUME as BASELINE
 
@@ -85,6 +88,8 @@ def judge_calls(fake: FakeAI) -> list[dict]:
 
 CHAT_RESUME = GenerateResult(reply="Done", company="Initech", experience_plan=[], resume_md="# Chat model resume")
 QUESTION = GenerateResult(reply="Which team?", company="Initech", experience_plan=[], resume_md=None)
+READY = ProChatResult(reply="Writing your resume now.", ready=True)
+ASKING = ProChatResult(reply="Which team?", ready=False)
 
 
 @pytest.fixture
@@ -112,9 +117,22 @@ def test_pro_off_makes_one_call(signed_in, fake_ai):
     assert len(fake.calls()) == 1
 
 
+def test_in_pro_mode_the_ai_model_only_asks_or_says_ready(signed_in, fake_ai):
+    signed_in.put("/api/preferences", json=PRO_PREFS)
+    fake = fake_ai(READY)
+    generate(signed_in, "Make it punchy")
+    [chat] = fake.calls(model=CHAT_MODEL, response_format=ProChatResult)
+    system = chat["messages"][0]["content"]
+    assert system.startswith(PRO_CHAT_INSTRUCTIONS)
+    assert "resume_md" not in system and "Do not write the resume yourself" in system
+    assert chat["messages"][-1] == {"role": "user", "content": "Make it punchy"}
+    assert not fake.calls(model=CHAT_MODEL, response_format=GenerateResult)
+    assert len(fake.calls()) == 1 + len(PRO_MODELS) + 1
+
+
 def test_pro_waits_while_the_chat_model_asks_questions(signed_in, fake_ai):
     signed_in.put("/api/preferences", json=PRO_PREFS)
-    fake = fake_ai(QUESTION)
+    fake = fake_ai(ASKING)
     body = generate(signed_in)
     assert body["pro"] is None
     assert body["reply"] == "Which team?"
@@ -123,12 +141,14 @@ def test_pro_waits_while_the_chat_model_asks_questions(signed_in, fake_ai):
 
 def test_pro_models_write_the_resume_now_with_a_timeout(signed_in, fake_ai):
     signed_in.put("/api/preferences", json=PRO_PREFS)
-    fake = fake_ai(CHAT_RESUME)
+    fake = fake_ai(READY)
     generate(signed_in, "Make it punchy")
     calls = fake.candidate_calls()
     assert sorted(c["model"] for c in calls) == sorted(PRO_MODELS)
+    [chat] = fake.calls(response_format=ProChatResult)
     for call in calls:
-        assert call["messages"][0] == fake.calls(model=CHAT_MODEL)[0]["messages"][0]
+        assert call["messages"][0]["content"].startswith(INSTRUCTIONS)
+        assert call["messages"][0]["content"][len(INSTRUCTIONS):] == chat["messages"][0]["content"][len(PRO_CHAT_INSTRUCTIONS):]
         assert call["messages"][-1] == {"role": "user", "content": f"Make it punchy\n\n{WRITE_NOW}"}
     fake.client.with_options.assert_called_with(timeout=CANDIDATE_TIMEOUT)
 
@@ -136,14 +156,14 @@ def test_pro_models_write_the_resume_now_with_a_timeout(signed_in, fake_ai):
 def test_pro_models_run_in_parallel(signed_in, fake_ai):
     """Each candidate call waits until all of them have started; sequential calls would break the barrier."""
     signed_in.put("/api/preferences", json=PRO_PREFS)
-    fake_ai(CHAT_RESUME, barrier=threading.Barrier(len(PRO_MODELS), timeout=5))
+    fake_ai(READY, barrier=threading.Barrier(len(PRO_MODELS), timeout=5))
     assert len(generate(signed_in)["pro"]["candidates"]) == len(PRO_MODELS)
 
 
 def test_judge_ranks_anonymous_candidates_with_rules_and_context(signed_in, fake_ai):
     signed_in.put("/api/resume/baseline", json={"content_md": "# Stored baseline"})
     signed_in.put("/api/preferences", json={**PRO_PREFS, "tone": "warm"})
-    fake = fake_ai(CHAT_RESUME)
+    fake = fake_ai(READY)
     generate(signed_in)
     [judge_call] = judge_calls(fake)
     assert judge_call["model"] == CHAT_MODEL
@@ -157,7 +177,7 @@ def test_judge_ranks_anonymous_candidates_with_rules_and_context(signed_in, fake
 
 def test_pro_response_has_ranked_candidates_and_the_best_resume(signed_in, fake_ai):
     signed_in.put("/api/preferences", json=PRO_PREFS)
-    fake_ai(CHAT_RESUME)
+    fake_ai(READY)
     body = generate(signed_in)
     pro = body["pro"]
     best = PRO_MODELS[-1]
@@ -176,7 +196,7 @@ def test_pro_response_has_ranked_candidates_and_the_best_resume(signed_in, fake_
 
 def test_failed_and_empty_candidates_are_dropped_and_reported(signed_in, fake_ai):
     signed_in.put("/api/preferences", json=PRO_PREFS)
-    fake = fake_ai(CHAT_RESUME, candidates={PRO_MODELS[0]: RuntimeError("boom"), PRO_MODELS[1]: QUESTION})
+    fake = fake_ai(READY, candidates={PRO_MODELS[0]: RuntimeError("boom"), PRO_MODELS[1]: QUESTION})
     body = generate(signed_in)
     assert [c["model"] for c in body["pro"]["candidates"]] == [PRO_MODELS[2]]
     assert body["pro"]["failed"] == [
@@ -189,7 +209,7 @@ def test_failed_and_empty_candidates_are_dropped_and_reported(signed_in, fake_ai
 def test_a_timed_out_candidate_is_reported(signed_in, fake_ai):
     signed_in.put("/api/preferences", json=PRO_PREFS)
     timeout = APITimeoutError(request=httpx.Request("POST", "https://openrouter.ai"))
-    fake_ai(CHAT_RESUME, candidates={PRO_MODELS[1]: timeout})
+    fake_ai(READY, candidates={PRO_MODELS[1]: timeout})
     pro = generate(signed_in)["pro"]
     assert pro["failed"] == [{"model": PRO_MODELS[1], "reason": f"timed out after {CANDIDATE_TIMEOUT} s"}]
     assert len(pro["candidates"]) == 2 and pro["judge_model"] == CHAT_MODEL
@@ -197,13 +217,13 @@ def test_a_timed_out_candidate_is_reported(signed_in, fake_ai):
 
 def test_no_failures_reported_when_every_candidate_returns_a_resume(signed_in, fake_ai):
     signed_in.put("/api/preferences", json=PRO_PREFS)
-    fake_ai(CHAT_RESUME)
+    fake_ai(READY)
     assert generate(signed_in)["pro"]["failed"] == []
 
 
 def test_a_single_candidate_is_returned_unjudged(signed_in, fake_ai):
     signed_in.put("/api/preferences", json=PRO_PREFS)
-    fake_ai(CHAT_RESUME, candidates={PRO_MODELS[0]: QUESTION, PRO_MODELS[1]: QUESTION})
+    fake_ai(READY, candidates={PRO_MODELS[0]: QUESTION, PRO_MODELS[1]: QUESTION})
     pro = generate(signed_in)["pro"]
     [only] = pro["candidates"]
     assert only["model"] == PRO_MODELS[2] and only["score"] is None
@@ -213,7 +233,7 @@ def test_a_single_candidate_is_returned_unjudged(signed_in, fake_ai):
 
 def test_no_candidates_answers_without_a_resume_and_reports_every_failure(signed_in, fake_ai):
     signed_in.put("/api/preferences", json=PRO_PREFS)
-    fake = fake_ai(CHAT_RESUME, candidates={m: RuntimeError("down") for m in PRO_MODELS})
+    fake = fake_ai(READY, candidates={m: RuntimeError("down") for m in PRO_MODELS})
     body = generate(signed_in)
     assert body["resume_md"] is None
     assert body["reply"] == NO_CANDIDATES
@@ -275,9 +295,29 @@ def test_judge_schema_only_allows_the_labels_in_use(count):
 
 def test_judge_is_asked_with_a_schema_for_the_candidates_it_sees(signed_in, fake_ai):
     signed_in.put("/api/preferences", json={**PRO_PREFS, "pro_models": PRO_MODELS[:2]})
-    fake = fake_ai(CHAT_RESUME)
+    fake = fake_ai(READY)
     generate(signed_in)
     [call] = judge_calls(fake)
     schema = call["response_format"].model_json_schema()
     review = next(d for d in schema["$defs"].values() if "label" in d["properties"])
     assert review["properties"]["label"]["enum"] == ["A", "B"]
+
+
+def real_pro_chat(model: str, job: str) -> ProChatResult:
+    system = build_pro_chat_prompt(BASELINE, job, Preferences(model=model), date.today().year)
+    message = "Please generate my custom resume for this job description."
+    return ai.ask_structured(ai.get_client(), build_messages(system, [], message), ProChatResult, model)
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("model", get_args(Model))
+def test_real_pro_chat_is_ready_when_asked_to_generate(model):
+    chat = real_pro_chat(model, JOB)
+    assert chat.ready, chat.reply
+
+
+@pytest.mark.integration
+def test_real_pro_chat_asks_for_a_missing_job_description():
+    chat = real_pro_chat("openai/gpt-oss-120b", "")
+    assert not chat.ready
+    assert "job" in chat.reply.lower()

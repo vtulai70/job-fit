@@ -700,3 +700,18 @@ test("main panels are ordered: baseline, custom resume, preferences, download hi
     "Download history",
   ]);
 });
+
+test("clearing the conversation empties the chat, keeps the resume, and starts the next turn fresh", async () => {
+  const fetchMock = mockChat({ body: RESUME_RESULT }, { body: QUESTION_RESULT });
+  await ready();
+  await userEvent.click(screen.getByRole("button", { name: "Generate custom resume" }));
+  await screen.findByText(RESUME_RESULT.reply);
+  await userEvent.click(screen.getByRole("button", { name: "Clear conversation" }));
+  expect(chatLines()).toEqual(["Ask anything about tailoring your resume."]);
+  expect(screen.queryByRole("button", { name: "Clear conversation" })).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Custom resume content")).toHaveValue(RESUME_RESULT.resume_md);
+
+  await userEvent.type(screen.getByLabelText("Message"), "Start over{Enter}");
+  await screen.findByText(QUESTION_RESULT.reply);
+  expect(generateBodies(fetchMock)[1].history).toEqual([]);
+});

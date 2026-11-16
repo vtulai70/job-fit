@@ -6,7 +6,10 @@ import PanelTitle from "./PanelTitle";
 
 type Props = { content: string | null; onUpload: (content: string) => void };
 
-/** Baseline resume: shows the saved content and uploads a replacement (.md or .txt).
+export const FORMAT_NOTE =
+  "Use a format the AI can easily understand, such as Markdown (.md): headings for sections and a list item per bullet.";
+
+/** Baseline resume: a note on the format, the saved content, and upload of a replacement (.md or .txt).
  * Starts collapsed when a baseline is already saved, expanded otherwise. */
 export default function ResumePanel({ content, onUpload }: Props) {
   const [open, setOpen] = useState(!content);
@@ -26,6 +29,7 @@ export default function ResumePanel({ content, onUpload }: Props) {
           <input type="file" accept=".md,.txt" onChange={upload} className="hidden" />
         </label>
       </div>
+      {open && <p className="mb-2 text-xs text-ink/60">{FORMAT_NOTE}</p>}
       {!open ? null : content ? (
         <pre aria-label="Baseline resume content" className="max-h-64 overflow-y-auto whitespace-pre-wrap text-sm">
           {content}
