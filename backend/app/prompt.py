@@ -13,12 +13,21 @@ RULES = """\
 - Include the contact details from the baseline resume, except the phone number when the user
   preferences say to leave it out.
 - Organize experience into sections exactly as the user preferences below say. Never drop a role
-  that falls inside one of those windows.
+  that falls inside one of those windows; the only exception is leaving out the whole Earlier
+  Experience section to fit the maximum length (see the next rules).
 - Only include licenses and certifications relevant to the job description.
 - Include or leave out the volunteering section exactly as the user preferences below say.
 - Keep the resume within the maximum length in the user preferences below: count the words and
-  non-blank lines before answering, and shorten (fewer and shorter bullets, fewer list lines, drop the
-  least relevant details) until it fits.
+  non-blank lines before answering. If it is too long, apply these steps in this order, stopping as
+  soon as it fits, and do not skip ahead to a later step while an earlier one still applies:
+  1. Leave out the volunteering section (if the other rules would include it). This always comes
+     first, even when the job mentions volunteering.
+  2. Put all the contact details on one line, separated by " | ".
+  3. Put all the tools and languages on one line, separated by " | ".
+  4. Leave out the whole Earlier Experience section.
+  5. Only then shorten within the remaining sections: fewer and shorter bullets and list items.
+  Volunteering and Earlier Experience are the only sections you may leave out to fit; keep every
+  other section of the resume (e.g. the summary, competencies, and tools and languages), shortened.
 - Whatever the length, the resume always starts with the person's name as a level-1 Markdown heading
   ("# Name", as in the baseline), followed by the contact details, and always has an "## Education"
   section. Shorten other sections instead.
@@ -87,7 +96,8 @@ PHONE_INCLUDE = "include the phone number from the baseline resume in the contac
 PHONE_EXCLUDE = "do NOT include the phone number anywhere in the resume; keep the other contact details"
 VOLUNTEERING_IF_RELEVANT = (
     "include the volunteering section from the baseline resume only if the job description specifically "
-    "mentions volunteering or work-life balance; otherwise leave it out entirely"
+    "mentions volunteering or work-life balance; otherwise leave it out entirely. Even then, leave it out "
+    "first if the resume would otherwise exceed the maximum length"
 )
 VOLUNTEERING_EXCLUDE = "do NOT include a volunteering section or any volunteering activity anywhere in the resume"
 GRADUATION_INCLUDE = "keep the graduation or completion year of each degree as in the baseline resume"
@@ -149,7 +159,9 @@ def experience_rules(prefs: Preferences, year: int) -> str:
             f'- "## Earlier Experience" section: every role that ended between {earlier_from} and '
             f"{professional_from - 1}. Each entry is one Markdown list item with only the role, company name "
             'and years, e.g. "- Lead Software Designer, Nokia, 2004 - 2007". No sub-bullets, descriptions, '
-            "locations, months or any other details."
+            "locations, months or any other details. If the resume would still exceed the maximum length after "
+            "leaving out volunteering and putting the contact details and the tools and languages on one line "
+            "each, leave out this whole section."
         )
     rules.append(
         f"- Leave out every role that ended before {earlier_from}"

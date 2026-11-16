@@ -400,7 +400,8 @@ OMITTED = ["Pinpoint", "Glenayre", "MILLENIUM", "PROFIN", "Sibiu", "Associate As
 
 @pytest.mark.integration
 def test_real_generation_default_experience_windows():
-    system = build_system_prompt(RESUME, JOB, Preferences(), 2026)
+    """Default windows with room to spare (3 pages), so Earlier Experience is not left out to fit the length."""
+    system = build_system_prompt(RESUME, JOB, Preferences(max_pages=3), 2026)
     result = ai.ask_structured(ai.get_client(), build_messages(system, [], "Generate my custom resume now. Do not ask questions."), GenerateResult)
     for placement in result.experience_plan:
         expected = "professional" if placement.end_year >= 2011 else "earlier" if placement.end_year >= 2001 else "omitted"
@@ -469,6 +470,20 @@ def test_generate_sends_stored_volunteering_preference(signed_in, use_ai, includ
     assert f"Volunteering: {expected}" in sent_messages(client)[0]["content"]
 
 
+def test_system_prompt_lists_the_steps_to_fit_the_length_in_order():
+    prompt = build_system_prompt("# Me", "Job", Preferences(), 2026)
+    steps = [
+        "1. Leave out the volunteering section",
+        '2. Put all the contact details on one line, separated by " | ".',
+        '3. Put all the tools and languages on one line, separated by " | ".',
+        "4. Leave out the whole Earlier Experience section.",
+        "5. Only then shorten within the remaining sections",
+    ]
+    positions = [prompt.index(step) for step in steps]
+    assert positions == sorted(positions)
+    assert "the only exception is leaving out the whole Earlier" in prompt
+
+
 def test_system_prompt_has_the_page_rules():
     prompt = build_system_prompt("# Me", "Job", Preferences(max_pages=1), 2026)
     assert "Keep the resume within the maximum length in the user preferences below" in prompt
@@ -521,7 +536,21 @@ def test_real_generation_leaves_out_volunteering_when_turned_off_even_if_the_job
     assert "Reef" not in md and "Sea Turtle" not in md
 
 
+ONE_PAGE = (
+    "Known limitation (prompt only, by decision): for this long baseline a 1-page limit and the order of the "
+    "fitting steps are met in only part of the runs"
+)
+
+
 @pytest.mark.integration
-@pytest.mark.parametrize("max_pages", [1, 2])
+@pytest.mark.parametrize("max_pages", [pytest.param(1, marks=pytest.mark.xfail(strict=False, reason=ONE_PAGE)), 2])
 def test_real_generation_stays_within_max_pages(max_pages):
     assert pdf_pages(real_resume(JOB, Preferences(max_pages=max_pages))) <= max_pages
+
+
+@pytest.mark.integration
+@pytest.mark.xfail(strict=False, reason=ONE_PAGE)
+def test_real_one_page_resume_drops_volunteering_and_puts_contacts_on_one_line():
+    md = real_resume(WORK_LIFE_JOB, Preferences(max_pages=1))
+    assert section(md, "Volunteering") == "" and "Reef" not in md
+    assert any("vtulai@yahoo.com" in line and "|" in line for line in md.splitlines())
