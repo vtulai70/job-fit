@@ -156,8 +156,8 @@ def experience_rules(prefs: Preferences, year: int) -> str:
     ]
     if prefs.earlier_years:
         rules.append(
-            f'- "## Earlier Experience" section: every role that ended between {earlier_from} and '
-            f"{professional_from - 1}. Each entry is one Markdown list item with only the role, company name "
+            f'- "## Earlier Experience" section, placed directly after the Professional Experience section: every '
+            f"role that ended between {earlier_from} and {professional_from - 1}. Each entry is one Markdown list item with only the role, company name "
             'and years, e.g. "- Lead Software Designer, Nokia, 2004 - 2007". No sub-bullets, descriptions, '
             "locations, months or any other details. If the resume would still exceed the maximum length after "
             "leaving out volunteering and putting the contact details and the tools and languages on one line "

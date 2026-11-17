@@ -122,10 +122,15 @@ def test_optimization_levels_match_their_names():
     assert "rewrite and reprioritize" in OPTIMIZATION["full"]
 
 
+def test_earlier_experience_comes_directly_after_professional_experience():
+    rules = experience_rules(Preferences(), 2026)
+    assert '"## Earlier Experience" section, placed directly after the Professional Experience section' in rules
+
+
 def test_experience_rules_default_windows():
     rules = experience_rules(Preferences(), 2026)
     assert "Professional Experience\" section: every role that ended in 2011 or later" in rules
-    assert "Earlier Experience\" section: every role that ended between 2001 and 2010" in rules
+    assert "placed directly after the Professional Experience section: every role that ended between 2001 and 2010" in rules
     assert "only the role, company name and years" in rules
     assert "one Markdown list item" in rules
     assert "No sub-bullets" in rules
@@ -420,6 +425,8 @@ def test_real_generation_default_experience_windows():
         assert text in earlier, text
     assert "ct technologies" in earlier.lower()
     assert "Intrinsyc" not in professional
+    headings = [h.strip() for h in re.findall(r"^##\s+(.+)$", md, re.M)]
+    assert headings[headings.index("Earlier Experience") - 1] == "Professional Experience", headings
     entries = [line for line in earlier.splitlines()[1:] if line.strip() and line.strip() != "---"]
     assert len(entries) == 3, entries
     assert all(re.match(r"\s*[-*] \S", line) for line in entries), entries

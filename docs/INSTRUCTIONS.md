@@ -25,6 +25,7 @@ Your task is to analyze a job description and generate a custom resume and cover
 - IMPORTANT: Extended experience entries should only have role, company name and years, do not include any other details
 - IMPORTANT: Do not include the year of the university graduation, unless the user preference says to include it
 - IMPORTANT: in order to keep the generated resume in the number of pages specified, you can arrange the content as follows: drop the volunteering section (if if was going to be included as per the other rules), arrange the contact entries on one line and separate with '|', arrange the tools and languages on one line and separate with '|', drop the earlier experience section.
+- IMPORTANT: if included, the Earlier Experience section shpuld ALWAYS follow the Professional Experience section.
 - Only include licenses and certifications if relevant for the job description
 - Only include the volunteering section if the job description contains references to either volunteering or work-life balance 
 - Keep the resume under the number of pages from the preferences
